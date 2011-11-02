@@ -1,0 +1,24 @@
+This work was packaged for Debian by:
+
+    James Gardner <james@feynman.3aims.com> on Thu, 15 Sep 2011 12:47:22 +0100
+
+It was downloaded from <http://jimmyg.org/james>
+
+Upstream Author(s):
+
+    James Gardner <james@example.com>
+
+Copyright:
+
+    Copyright (C) 2011 James Gardner <james@example.com>
+
+License:
+
+    This is the license
+    and it is really good
+
+The Debian packaging is:
+
+    Copyright (C) 2011 James Gardner <james@feynman.3aims.com>
+
+and is licensed under the same license specified above.

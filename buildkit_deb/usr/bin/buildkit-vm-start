@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Use like this:
+#
+#    buildkit-vm-start eth1 qtap0 512M 1 /home/james/Vms/ckan_3/tmpuNIv2h.qcow2
+
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+if [ $# -lt 5 ]
+then
+    echo "ERROR: call this script with network device name, tunnel name, amount of memory, number of CPUs and path to the image e.g." 
+    echo "       $0 eth0 qtap0 512M 4 /home/Vms/ckan_2/tmpKfAdeU.qcow2 [extra args to KVM]"
+    exit 1
+fi
+
+NETWORK_DEVICE=$1
+TUNNEL=$2
+MEM=$3
+CPUS=$4
+IMAGE=$5
+EXTRA=$6
+MACADDR="52:54:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/')";
+IP=`/sbin/ifconfig $NETWORK_DEVICE | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'`
+
+if [ ! $IP ] 
+then
+    echo "ERROR: No IP address available for $NETWORK_DEVICE"
+    exit 1
+fi
+echo "Host IP is $IP"
+echo "Starting apt-proxy ..."
+/etc/init.d/apt-proxy start
+echo "done."
+echo "Starting apache to host the repos ..."
+/etc/init.d/apache2 start
+echo "done."
+echo "Creating bridge..."
+iptables -t nat -A POSTROUTING -o ${NETWORK_DEVICE} -j MASQUERADE
+brctl addbr br0
+ifconfig br0 192.168.100.254 netmask 255.255.255.0 up
+echo "done."
+echo "Creating tunnel..."
+modprobe tun
+tunctl -b -u root -t ${TUNNEL}
+brctl addif br0 ${TUNNEL}
+ifconfig ${TUNNEL} up 0.0.0.0 promisc
+echo "done."
+echo "Ensuring forwarding is enabled ..."
+echo "1" > /proc/sys/net/ipv4/ip_forward
+echo "done."
+echo "Mounting VM to update the DNS settings ..."
+
+# We don't support .qcow2 in this version, so using lines for disk.raw instead
+# export IMAGE_NAME=`sudo ls /var/lib/buildkit/vm/buildkit10/ | awk '{print $0}' | grep -v "run.sh"`
+# modprobe nbd max_part=63
+# qemu-nbd --connect=/dev/nbd0 ${IMAGE}
+# mount /dev/nbd0p1 /mnt/qemu
+# qemu-nbd --disconnect ${IMAGE}
+
+mount -t ext4 -o loop,offset=512 $IMAGE /var/lib/buildkit/vmtmp
+cp /etc/resolv.conf /var/lib/buildkit/vmtmp/etc/resolv.conf
+cat << EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
+// Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };" 
+EOF
+umount /var/lib/buildkit/vmtmp
+echo "Starting VM ${IMAGE} on ${TUNNEL} via ${NETWORK_DEVICE} with MAC ${MACADDR}..."
+echo "WARNING: Make sure you correctlty shut down the machine to avoid corruption."
+/usr/bin/kvm -M pc-0.12 -enable-kvm -m ${MEM} -smp ${CPUS} -name dev -monitor pty -boot c -drive file=${IMAGE},if=ide,index=0,boot=on -net nic,macaddr=${MACADDR} -net tap,ifname=${TUNNEL},script=no,downscript=no -serial none -parallel none -usb ${EXTRA}
+

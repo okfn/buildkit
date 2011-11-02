@@ -1,0 +1,17 @@
+include doc/index.txt
+include doc/source/*.rst
+include test/doc.py
+include test/README.txt
+include test/base/README.txt
+include test/base/eggs_3rd_party/README.txt
+include test/base/eggs/README.txt
+include test/website/code/README.txt
+include test/website/code/eggs/README.txt
+include test/website/Templates/main.dwt
+include example/*.py
+include example/README.txt
+include ez_setup.py
+include CHANGELOG.txt
+include LICENSE.txt
+
+recursive-include buildkit_deb

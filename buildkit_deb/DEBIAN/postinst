@@ -1,0 +1,16 @@
+#!/bin/bash
+. /usr/lib/buildkit/buildkit_common.sh
+
+NAME="BuildKit-Automatic-Packaging"
+BASEDIR="/var/lib/buildkit"
+
+buildkit_ensure_user_and_group
+buildkit_ensure_dist_deps
+buildkit_ensure_buildkit_directories "${BASEDIR}"
+buildkit_ensure_public_key "$NAME" "buildkit@example.com" "BuildKitkey" "buildkit" "${BASEDIR}/key" "${BASEDIR}/repo"
+buildkit_ensure_base_repo "${BASEDIR}/repo" "$NAME"
+buildkit_ensure_apache "${BASEDIR}/repo"
+buildkit_ensure_permissions
+
+
+

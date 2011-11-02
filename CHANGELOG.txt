@@ -1,0 +1,41 @@
+Changes
+=======
+
+0.2.0
+-----
+
+2011-11-02
+~~~~~~~~~~
+
+* Complete overhaul to support the creation of Debian packages from Python
+  software, add them to a repository and test them in virtual machines on Ubuntu
+  LTS.
+
+0.1.2
+-----
+
+2011-02-19
+~~~~~~~~~~
+
+* Bitbucket support
+* Ability to package as ``.deb`` files from a virtualenv
+
+0.1.1
+-----
+
+2010-09-05
+~~~~~~~~~~
+
+* Changed template ``MANIFEST.in`` to include docs ``Makefile`` and ``conf.py``
+* Updated ``build.py`` example to build docs from distribution
+* Changed the ``build_html()`` and ``run()`` signatures
+
+2010-03-02
+~~~~~~~~~~
+
+* Added a command to package up dependant modules into a single directory
+
+0.1.0
+-----
+
+* First version

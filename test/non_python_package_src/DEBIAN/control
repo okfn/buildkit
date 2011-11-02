@@ -1,0 +1,14 @@
+Source: buildkit
+Section: main/python
+Priority: extra
+Maintainer: James Gardner <james@example.com>
+Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7), python (>= 2.5), python-support
+Version: 0.1.0+01+lucid
+Standards-Version: 3.8.3
+XS-Python-Version: >= 2.5
+Homepage: http://jimmyg.org/james
+Package: buildkit
+Architecture: all
+Depends: rsync, apache2
+Description: Tools for managing the creating and testing of Python eggs and documentation
+

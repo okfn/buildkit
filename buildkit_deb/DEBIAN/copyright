@@ -1,0 +1,37 @@
+This work was packaged for Debian by:
+
+    James Gardner <james@pythonweb.org> on Thu, 22 Sep 2011 10:10:27 +0100
+
+It was downloaded from <http://jimmyg.org/work/code/buildkit>
+
+Upstream Author(s):
+
+    James Gardner <james@pythonweb.org>
+
+Copyright:
+
+    Copyright (C) 2011 3aims Ltd
+
+License:
+
+    buildkit - Cloud infrastructure and .deb file management software
+    Copyright (C) 2011 3aims Ltd
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+    
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+The Debian packaging is:
+
+    Copyright (C) 2011 James Gardner <james@pythonweb.org>
+
+and is licensed under the same license specified above.
