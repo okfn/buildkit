@@ -22,17 +22,23 @@ CPUS=$4
 IMAGE=$5
 EXTRA=$6
 MACADDR="52:54:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/')";
-IP=`/sbin/ifconfig $NETWORK_DEVICE | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'`
 
-if [ ! $IP ] 
+IP=`/sbin/ifconfig $NETWORK_DEVICE | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}' | grep -v "127.0.0.1" | grep -v "192.168.100."`
+if [ ! "$IP" ] 
 then
     echo "ERROR: No IP address available for $NETWORK_DEVICE"
     exit 1
 fi
 echo "Host IP is $IP"
-echo "Starting apt-proxy ..."
-/etc/init.d/apt-proxy start
-echo "done."
+
+APTPROXY=`ps aux | grep /usr/sbin/apt-proxy | grep -v grep`
+if [ ! "$APTPROXY" ]
+then
+    echo "Starting apt-proxy ..."
+    /etc/init.d/apt-proxy start
+    echo "done."
+fi
+
 echo "Starting apache to host the repos ..."
 /etc/init.d/apache2 start
 echo "done."
@@ -64,6 +70,18 @@ cp /etc/resolv.conf /var/lib/buildkit/vmtmp/etc/resolv.conf
 cat << EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
 // Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };" 
 EOF
+echo $IP > /var/lib/buildkit/vmtmp/etc/buildkit_host_ip
+COMMAND_OUTPUT=`cat /var/lib/buildkit/vmtmp/etc/hosts | grep "host.buildkit"`
+if ! [[ "$COMMAND_OUTPUT" =~ "host.buildkit" ]] ; then
+    echo "Adding host.buildkit in VM /etc/hosts  ..."
+    cat << EOF | sudo tee -a /var/lib/buildkit/vmtmp/etc/hosts
+$IP host.buildkit
+EOF
+else
+    echo "Updating host.buildkit in VM /etc/hosts  ..."
+    sudo sed -e "s,.* host.buildkit,$IP host.buildkit," -i /var/lib/buildkit/vmtmp/etc/hosts
+fi
+
 umount /var/lib/buildkit/vmtmp
 echo "Starting VM ${IMAGE} on ${TUNNEL} via ${NETWORK_DEVICE} with MAC ${MACADDR}..."
 echo "WARNING: Make sure you correctlty shut down the machine to avoid corruption."

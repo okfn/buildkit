@@ -30,6 +30,16 @@ buildkit_ensure_dist_deps () {
 #sudo ./usr/bin/buildkit-gitflow-installer
 }
 
+buildkit_ensure_hosts () {
+    COMMAND_OUTPUT=`cat /etc/hosts | grep "default.vm.buildkit"`
+    if ! [[ "$COMMAND_OUTPUT" =~ "default.vm.buildkit" ]] ; then
+        echo "Adding default.vm.buildkit to /etc/hosts  ..."
+        cat << EOF | sudo tee -a /etc/hosts
+192.168.100.10 default.vm.buildkit
+EOF
+    fi
+}
+
 buildkit_ensure_user_and_group () {
     local INSTANCE
     COMMAND_OUTPUT=`cat /etc/group | grep "buildkit:"`
@@ -144,7 +154,7 @@ buildkit_ensure_apache() {
 	    #          dependent packages
 	
 	    DocumentRoot $REPOBASE
-	    ServerName buildkit.repo
+	    ServerName host.buildkit
 	
 	    <LocationMatch "/(.*)/conf" >
 	        deny from all
@@ -157,6 +167,5 @@ buildkit_ensure_apache() {
 	EOF
     sudo a2ensite buildkit-repo
     sudo /etc/init.d/apache2 restart
-#sudo sed -e "s/127.0.0.1/127.0.0.1  buildkit.repo/" -i /etc/hosts
 }
 

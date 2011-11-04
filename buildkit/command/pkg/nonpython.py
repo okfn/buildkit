@@ -48,6 +48,8 @@ def run(cmd):
         cmd.err('ERROR: No such directory %r', cmd.args[0])
         return 1
     opts = facilify.str_keys(cmd.opts, ignore=['help'])
+    if opts.has_key('output_dir'):
+        opts['output_dir'] = facilify.uniform_path(opts['output_dir'])
     result = cmd.parent.dist.build_non_python(
         facilify.uniform_path(cmd.args[0]),
         **opts

@@ -11,6 +11,7 @@ buildkit_ensure_public_key "$NAME" "buildkit@example.com" "BuildKitkey" "buildki
 buildkit_ensure_base_repo "${BASEDIR}/repo" "$NAME"
 buildkit_ensure_apache "${BASEDIR}/repo"
 buildkit_ensure_permissions
+buildkit_ensure_hosts
 
 
 

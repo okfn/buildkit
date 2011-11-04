@@ -427,7 +427,8 @@ def deps(
     no_present=False,
     no_missing=False,
 ):
-    dist.log.info('  Getting dependencies for %r ...', src_dir)
+    dist.log.info('  Building python-%s ...', src_dir.split('/')[-1])
+    dist.log.info('    Analysing dependencies in requires/* files ...')
     present_error = missing_error = None
     present_deps = missing_deps = conflict_deps = ''
     missing_requirements = conflict_requirements = {}
@@ -537,13 +538,16 @@ def parse_deps(
                 pip_path,
                 'install',
                 '--upgrade',
-                'pip',
-            ], 
+                'pip>=1.0,<=1.0.99',
+            ],
             merge=True
         )
         if result.retcode:
             dist.log.error(result.stdout)
             raise Exception('Failed to upgrade pip %r'%pip_path)
+    cache_path = os.path.join(build_env_dir, 'cache')
+    if not os.path.exists(cache_path):
+        os.mkdir(cache_path)
     if os.path.exists(os.path.join(src_dir, rel_requires_path)):
         for line in facilify.file_contents(os.path.join(src_dir, rel_requires_path)).split('\n'):
             if not line.strip() or line.strip().startswith('#'):
@@ -556,6 +560,7 @@ def parse_deps(
                     'install', 
                     # '--upgrade', 
                     '--no-deps', 
+                    '--download-cache', cache_path,
                     '--ignore-installed', 
                     '-e', requirement,
                 ]
@@ -616,6 +621,7 @@ def parse_deps(
                             'install',
                             # '--upgrade',
                             '--no-deps', 
+                            '--download-cache', cache_path,
                             '--ignore-installed', 
                             '--no-install',
                             requirement,
@@ -725,6 +731,17 @@ def build_python(
                 metadata[name] = parsed_data[name.capitalize().replace('_', '-')][0]
     for k, v in metadata.items():
         if not v or v == 'UNKNOWN':
+            #if k == 'author_email' and author_email is not None:
+            #    metadata['author_email'] = author_email
+            #elif k == 'packager_email' and packager_email is not None:
+            #    metadata['packager_email'] = packager_email
+            #elif k == 'author_name' and author_name is not None:
+            #    metadata['author_name'] = author_name
+            #elif k == 'packager_name' and packager_name is not None:
+            #    metadata['packager_name'] = packager_name
+            #elif k == 'url' and url is not None:
+            #    metadata['url'] = url
+            #else:
             return facilify.obj(error='No %s could be determined for the package, please specify it manually'%k)
     if not license_text:
         if os.path.exists(os.path.join(src_dir, 'LICENSE.txt')):
@@ -806,7 +823,7 @@ def build_python(
             deps += ', '+calculated_deps.missing_deps
         else:
             deps = calculated_deps.missing_deps
-    dist.log.info('  Building package ...')
+    dist.log.info('  Fetching and analysing deps for %r ...', metadata.package)
     dist.control_from_template(
         # What about renaming?
         debian_path=os.path.join(build_src_dir, 'debian'),
@@ -923,11 +940,11 @@ def build_non_python(
                 ), 
             )
         ]
-        #dist.log.info(' '.join(cmd))
-        facilify.process(
+        result = facilify.process(
             cmd,
             cwd = output_dir,
             merge = True,
         )
+    dist.log.info('Building non-Python package complete.')
     return build_result
 

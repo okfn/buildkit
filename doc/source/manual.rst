@@ -11,7 +11,6 @@ BuildKit is really 4 pieces of software in one. It has code for
 * creating a template from a directory structure that can be used to generate similar directory structures
 * generating an empty Python package set up for use with ``pip``, ``sphinx`` and ``pypi`` with tests, doctests and packagable as a ``.deb`` file
 * setting up packages to use the ``git-flow`` methodology and hosting those projects
-* maintaining a website with different versions of different packages' documentation available and links to the downloads
 * automatically generating ``.deb`` packages for a Python package and all its dependencies
 * running Python tests and generating both Python ``.egg`` and source releases for a package
 * setting up and managing a sophisticated test and release infrastructure using Debian packages, Debian apt repositories and KVM virtualisation
@@ -27,25 +26,50 @@ Other tools also to some of these things. For example, you may also be intereste
     Can automatically build a ``.deb`` from a Python package 
     build with ``python setup.py bdist``.
 
+Buildkit also used to do:
+
+* building a sdist release, installing into a clean virtualenv and running tests in isolation
+* maintaining a website with different versions of different packages' documentation available and links to the downloads
+
+These features will be added back in a future release.
+
 Buildkit Tutorial
 =================
 
-BuildKit is installed as a Debian package and only works on Ubuntu LTS. At the
-moment it is hosted at apt.okfn.org since it was used for packaging CKAN but
-that will change imminently.
+.. caution ::
 
-You can install it on Ubuntu LTS like this:
+   Buildkit only works on Ubuntu 10.04 LTS. Any other platform is untested and vitually guaranteed to break. Only use on Ubuntu 10.04.
+
+BuildKit is installed as a Debian package so the first thing you need to do is
+to use it to create a debian package from the source.
+
+Unzip the source distribution and change to the same directory as ``setup.py``.
+
+Now install all the dependencies listed in
+``buildkit_deb/DEBIAN/control.template``. At the time of writing you can do so
+like this:
 
 ::
 
-    sudo -s
-    echo 'deb http://apt.okfn.org/ckan-1.4.3.1 lucid universe' > /etc/apt/sources.list.d/okfn.list
-    wget -qO-  http://apt.okfn.org/packages.okfn.key | sudo apt-key add -
-    apt-get update
-    apt-get install buildkit
-    
+    sudo apt-get install ubuntu-vm-builder python-vm-builder gawk kvm sed findutils rsync apache2 reprepro gnupg wget dh-make devscripts build-essential fakeroot alien cdbs python-pip python-virtualenv subversion mercurial git-core python-buildkit apt-proxy kvm-pxe uml-utilities
+
 When the email configuration pops up choose "Internet Site" then accept the
 hostname suggested (or choose your own).
+
+Then build the buildkit ``.deb`` files like this:
+
+::
+
+    PACKAGEVERSION=01
+    mkdir -p dist/buildkit
+    python -m buildkit.run pkg nonpython -p "$PACKAGEVERSION" -o dist/buildkit --deb buildkit_deb
+    python -m buildkit.run pkg python -p "$PACKAGEVERSION" -o dist/buildkit --author-email james@pythonweb.org --deb .
+
+You'll then get two ``.deb`` files in ``dist/buildkit`` which you can install:
+
+::
+
+    sudo dpkg -i dist/buildkit/*.deb
 
 You'll most likely see this as part of the install:
 
@@ -72,15 +96,17 @@ entropy and generate you a key which it uses to sign your packages.
 
 QUESTION: Does the buildkit install leave you at a root prompt by mistake?
 
-The default install assumes you will be setting the "buildkit.repo" hostname to
+The default install assumes you will be setting the "host.buildkit" hostname to
 whichever system you will host your repository on and run VMs on. In this case
-this will be localhost so edit ``/etc/hosts`` to add the "buildkit.repo" domain
+this will be localhost so edit ``/etc/hosts`` to add the "host.buildkit" hostname
 to 127.0.0.1:
 
-    127.0.0.1       localhost buildkit.repo
+::
 
-At this point your repository will be running at http://buildkit.repo and
-apt-proxy will be installed and running at http://buildkit.repo:9999/ . The
+    127.0.0.1       localhost host.buildkit
+
+At this point your repository will be running at http://host.buildkit and
+apt-proxy will be installed and running at http://host.buildkit:9999/ . The
 latter will give you an error about not enough slashes in the URL if you visit
 it because it only expects to be visited with a full package path.
 
@@ -130,7 +156,7 @@ Whenever you want a new VM you can then just run:
 
 ::
 
-    qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/new/disk.raw
+    sudo -u buildkit qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/new/disk.raw
     
 This converts from the small .qcow2 file to a fresh ``disk.raw`` image.
 
@@ -150,16 +176,434 @@ The  username and password for the VM are both ``ubuntu``. You can also use
 ``sudo -s`` with the password  ``ubuntu`` to get root access. You may want to
 change the password with ``passwd``.
 
-Possible future BuildKit enhancements
-=====================================
+
+Example: Building and Testing the CKAN Package Install
+======================================================
+
+CKAN is an open source metadata catalogue that powers sites like data.gov.uk
+and which uses buildkit for its package install. In this section we'll walk
+through how to use buildkit to package it.
+
+Setting up
+----------
+
+First you need to get the source code for the version you want to package:
+
+::
+
+    hg clone -r release-v1.5 https://bitbucket.org/okfn/ckan/ 
+
+Next you need to install buildkit, either from source (as described above) or
+from an apt-repository where it is hosted. Once it is installed you'll have an
+apt repository running on your local machine as well as the ``buildkit``
+command and the ability to boot virtual machines for testing. (You'll need to
+build a base VM using the ``buildkit vm create`` command as described above).
+
+The individual buildkit commands that are needed to build CKAN are specified in
+the ``build.sh`` script so you should take a look at that. 
+
+Now on to the packaging.
+
+Packaging
+---------
+
+First edit ``build.sh`` to set the environment variables relevant to you.
+
+Run the build (not as root) like this:
+
+::
+
+    ./build
+
+At the end of the build you'll be prompted for your password so that ``sudo``
+can import the packages into the buildkit repository on your local machine to
+serve.
+
+You should end up with a set of packages the buildkit repository accessible
+from your apt repository as well as a set in ``ckan/dist/buildkit``.
+
+You can now test the build.
+
+Testing
+-------
+
+If you've followed the buildkit tutorial and created a base VM, you can now
+create a new virtual machine like so:
+
+::
+
+    sudo -u buildkit mkdir /var/lib/buildkit/vm/ckan
+    sudo -u buildkit qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/ckan/disk.raw
+
+After a few moments you can start your VM (tip: be sure to specify the correct network interface that the VM should use to access the internet, in this case I've used ``eth1``, yours might be ``eth0``).
+
+::
+
+    sudo buildkit-vm-start eth1 qtap0 1024M 4 /var/lib/buildkit/vm/ckan/disk.raw
+
+Here I'm giving the VM 1024M and letting it use 4 CPUs. For a production CKAN
+you should have at least 1.5Gb of RAM.
+
+Now you can connect from the host to the guest over SSH:
+
+::
+
+    ssh ubuntu@192.168.100.10
+
+Or if you have installed buildkit as standard and not changed any network
+settings you can use the ``default.vm.buildkit`` hostname that buildkit set up
+for you when it was installed:
+
+::
+
+    ssh ubuntu@default.vm.buildkit
+
+The  username and password for the VM are both ``ubuntu``. You can also use
+``sudo -s`` with the password  ``ubuntu`` to get root access. You may want to
+change the password with ``passwd``.
+
+Optionally, you might want to install some common software at this point such
+as vim, screen, elinks or any other software you commonly use:
+
+::
+
+    sudo apt-get update
+    sudo apt-get install vim-nox screen elinks
+
+If it has been a while since you created the base VM you may also want to
+upgrade the core packages at this point:
+
+::
+
+    sudo apt-get update
+    sudo apt-get upgrade -y
+    
+At this point you can install the ckan package from within the VM. When you
+start the VM, the hostame ``host.buildkit`` is set up to point to the host
+server. The Apache configuration for the host server is set up serve the apt
+repo from the ``host.buildkit`` server alias so the commands below will set up
+access the host repo. The ``sudo`` password is ``ubuntu`` by default as already
+mentioned. Run the commands now:
+
+::
+
+    sudo apt-get update
+    sudo apt-get install -y wget
+    echo "deb http://host.buildkit/ckan-1.5 lucid universe" | sudo tee /etc/apt/sources.list.d/okfn.list
+    wget -qO- "http://host.buildkit/packages_public.key" | sudo apt-key add -
+    sudo apt-get update
+    sudo apt-get install -y ckan postgresql-8.4 solr-jetty
+
+.. caution ::
+
+    The last line in the commands above installs CKAN, the PostgreSQL database
+    engine, and the Solr search index server. If you intend to connect to a PostgreSQL or
+    Solr server that is running on a different machine you don't need to
+    install them. In that case, when you run the ``ckan-create-instance`` command later, 
+    choose ``"no"`` as the third parameter to tell the install command not to 
+    set up or configure the PostgreSQL database for CKAN. You'll then need to perform any
+    database creation and setup steps manually yourself.
+
+If you ever want to upgrade CKAN you can run:
+
+::
+
+    sudo apt-get update
+    sudo apt-get upgrade
+
+Sometimes a new CKAN release comes with extra packages. This is considered by
+Ubuntu to be a "dist upgrade". In this case run:
+
+::
+
+    sudo apt-get update
+    sudo apt-get dist-upgrade
+
+CKAN-specific instructions
+--------------------------
+
+In this section we'll look at preciesly how the rest of CKAN is set up. This
+serves as a useful example of how you might design your own software to be set
+up.
+
+The install will whirr away, downloading over 180Mb of packages (on a clean
+install) and take a few minutes, then towards the end you'll see this:
+
+::
+
+    Setting up solr-jetty (1.4.0+ds1-1ubuntu1) ...
+     * Not starting jetty - edit /etc/default/jetty and change NO_START to be 0 (or comment it out).
+
+You'll need to configure Solr for use with CKAN. You can do so like this:
+
+::
+
+    sudo ckan-setup-solr
+
+This changes the Solr schema to support CKAN, sets Solr to start automatically
+and then starts Solr. You shouldn't be using the Solr instance for anything
+apart from CKAN because the command above modifies its schema.
+
+You can now create CKAN instances as you please using the
+``ckan-create-instance`` command. It takes these arguments:
+
+Instance name
+
+    This should be a short letter only string representing the name of the CKAN
+    instance. It is used (amongst other things) as the basis for:
+    
+    * The directory structure of the instance in ``/var/lib/ckan``, ``/var/log/ckan``, ``/etc/ckan`` and elsewhere
+    * The name of the PostgreSQL database to use
+    * The name of the Solr core to use
+
+Instance Hostname/domain name
+
+    The hostname that this CKAN instance will be hosted at. It is
+    used in the Apache configuration virutal host in
+    ``/etc/apache2/sites-available/<INSTANCE_NAME>.common`` so that Apache can resolve
+    requests directly to CKAN.
+
+    If you install more than one CKAN instance you'll need to set different
+    hostnames for each. If you ever want to change the hostname CKAN responds on
+    you can do so by editing ``/etc/apache2/sites-available/<INSTANCE_NAME>.common`` and
+    restarting apache with ``sudo /etc/init.d/apache2 restart``.
+
+Local PostgreSQL support (``"yes"`` or ``"no"``)
+
+    If you specify ``"yes"``, CKAN will also set up a local database user and
+    database and create its tables, populating them as necessary and saving the
+    database password in the config file. You would normally say ``"yes"`` unless
+    you plan to use CKAN with a PostgreSQL on a remote machine.
+
+For production use the second argument above is usually the domain name of the
+CKAN instance, but in our case we are testing, so we'll use the default
+hostname buildkit sets up to the server which is ``default.vm.buildkit`` (this
+is automatically added to your host machine's ``/etc/hosts`` when the VM is
+started so that it will resovle from your host machine - for more complex
+setups you'll have to set up DNS entries instead).
+
+Create a new instance like this:
+
+::
+
+    sudo ckan-create-instance std default.vm.buildkit yes
+
+You'll need to specify a new instance name and different hostname for each CKAN
+instance you set up.
+
+Don't worry about warnings you see like this during the creation process, they are harmless:
+
+::
+
+    /usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/reflection.py:46: SAWarning: Did not recognize type 'tsvector' of column 'search_vector' ret = fn(self, con, *args, **kw)
+
+You can now access your CKAN instance from your host machine as http://default.vm.buildkit/
+
+.. tip ::
+
+    If you get taken straight to a login screen it is a sign that the PostgreSQL
+    database initialisation may not have run. Try running:
+ 
+    ::
+ 
+        INSTANCE=std
+        sudo paster --plugin=ckan db init --config=/etc/ckan/${INSTANCE}/${INSTANCE}.ini
+ 
+    If you specified ``"no"`` as part of the ``create-ckan-instance`` you'll
+    need to specify database and solr settings in ``/etc/ckan/std/std.ini``. At the
+    moment you'll see an "Internal Server Error" from Apache. You can always
+    investigate such errors by looking in the Apache and CKAN logs for that
+    instance. For example (leading data stripped for clarity):
+ 
+    ::
+ 
+        $ sudo -u ckanstd tail -f /var/log/ckan/std/std.log
+        WARNI [vdm] Skipping adding property Package.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property PackageTag.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property Group.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property PackageGroup.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property GroupExtra.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property PackageExtra.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property Resource.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property ResourceGroup.resources_all to revisioned object
+        WARNI [vdm] Skipping adding property ResourceGroup.all_revisions_unordered to revisioned object
+        WARNI [vdm] Skipping adding property PackageRelationship.all_revisions_unordered to revisioned object
+ 
+    No error here, let's look in Apache (leading data stripped again):
+ 
+    ::
+ 
+        $ tail -f /var/log/apache2/std.error.log
+            self.connection = self.__connect()
+          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/pool.py", line 319, in __connect
+            connection = self.__pool._creator()
+          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/strategies.py", line 82, in connect
+            return dialect.connect(*cargs, **cparams)
+          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/default.py", line 249, in connect
+            return self.dbapi.connect(*cargs, **cparams)
+        OperationalError: (OperationalError) FATAL:  password authentication failed for user "ckanuser"
+        FATAL:  password authentication failed for user "ckanuser"
+         None None
+ 
+    There's the problem, you need to set up the ``sqlalchemy.url`` option in the
+    config file. Edit it to set the correct settings:
+ 
+    ::
+ 
+        sudo -u ckanstd vi /etc/ckan/std/std.ini
+
+Each instance you create has its own virtualenv that you can install extensions
+into at ``/var/lib/ckan/std/pyenv`` and its own system user, in this case
+``ckanstd``.  Any time you make changes to the virtualenv, you should make sure
+you are running as the correct user otherwise Apache might not be able to load
+CKAN.  For example, say you wanted to install a ckan extension, you might run:
+
+::
+
+    sudo -u ckanstd /var/lib/ckan/std/pyenv/bin/pip install <name-of-extension>
+
+You can now configure your instance by editing ``/etc/ckan/std/std.ini``:
+
+::
+
+    sudo -u ckanstd vi /etc/ckan/std/std.ini
+
+After any change you can touch the ``wsgi.py`` to tell Apache's mod_wsgi that
+it needs to take notice of the change for future requests:
+
+::
+
+    sudo touch /var/lib/ckan/std/wsgi.py
+
+Or you can of course do a full restart if you prefer:
+
+::
+
+    sudo /etc/init.d/apache2 restart
+
+Browsers seem to cache the homepage so if you make a change, always do a full
+browser refresh by holding down shift or ctrl.
+
+One of the key things it is good to set first is the ``ckan.site_description``
+option. The text you set there appears in the banner at the top of your CKAN
+instance's pages.
+
+.. tip ::
+
+    If you want to be able to access the instance from the VM itself for testing
+    purposes using ``elinks`` or similar, you'll need to update the ``/etc/hosts``
+    file on the VM so that the ``127.0.0.1`` line includes ``default.vm.buildkit``:
+
+    :: 
+
+        127.0.0.1 localhost default.vm.buildkit
+
+    You can now run:
+
+    ::
+
+        sudo apt-get install -y elinks
+        elinks http://default.vm.buildkit/
+
+You can enable and disable particular CKAN instances by running:
+
+::
+
+    sudo a2ensite std
+    sudo /etc/init.d/apache2 reload
+
+or:
+
+::
+
+    sudo a2dissite std
+    sudo /etc/init.d/apache2 reload
+
+respectively.
+
+
+Detailed CKAN (Not relevant to BuildKit per-se)
+-----------------------------------------------
+
+Let's get used to some of the CKAN command line tools.
+
+To begin working with it let's set up a user and some permissions. You can
+create an account via the web interface but as a demo let's first create an
+admin account from the command line:
+
+::
+
+    $ sudo paster --plugin=ckan user add admin --config=/etc/ckan/std/std.ini
+    No handlers could be found for logger "vdm"
+    Creating user: 'admin'
+    Password:
+    Confirm password:
+    <User id=9c0180ab-c239-4f00-bd3d-538635192f74 name=admin openid=None password=fb10b7015dfe85a694cbebec1bfed8f18517c841fa4392430805c050fff27a09e35043972c8b4e1d fullname=None email=None apikey=e6fead47-636a-426d-b30a-37f61fa6fdc4 created=2011-06-27 13:52:08.141205 about=None>
+
+The password you enter will be the one you need to login with in CKAN. Notice
+that you also get assigned a CKAN API key, in this case it was
+e6fead47-636a-426d-b30a-37f61fa6fdc4.
+
+For exploratory purposes, you might as well make the admin user a sysadmin. You
+obviously wouldn't give most users these rights as they would then be able to
+do anything. You can make the admin user a sysadmin like this:
+
+::
+
+    $ sudo paster --plugin=ckan sysadmin add admin --config=/etc/ckan/std/std.ini
+    No handlers could be found for logger "vdm"
+    
+    Added admin as sysadmin
+
+You can now login to the CKAN frontend with the username admin and the password you set up.
+Finally, it can be handy to have some test data to start with. You can get test data like this:
+
+::
+
+    $ sudo paster --plugin=ckan create-test-data --config=/etc/ckan/std/std.ini
+
+Now you should be up and running.
+
+Tidy-ups to expect in the next CKAN release:
+
+* Removal of ``ckan/MIGRATE.txt``
+* Removal of all code that depends on FormAlchemy and its dependencies
+
+Potential Packaging Issues
+==========================
+
+There are some gotchas to be aware of with ``buildkit`` so far:
+
+* The packaging process occasionally strips ``__init__.py`` files of all their
+  content. It is therefore best to never have information in ``__init__.py``
+  files which is why, for extensions, we now have plugins implemented in
+  ``plugin.py`` rather than ``__init__.py``.
+* Packaging sometimes strips our key directories, such as any named ``dist``, 
+  they just won't be present in the packaged version.
+
+A future implementation of the packaging may be able to address these
+deficiencies. I also have some ideas for other possible future CKAN
+enhancements:
+
+* Creating a new instance could also automatically restore from any latest
+  dumps that existed for that instance
+* When "conflict" functionality is used in the Python packaging, the code is copied 
+  directly into the main project. At the moment it is the packager's
+  responsibility to ensure that the licenses of those conflicting modules are
+  copied into the main license for the overall package. It would be nice if the
+  packaging code either gave a warning about this or automatically added the
+  licenses.
+
+Other ideas:
 
 * Make the buildkit-vm-create command part of the buildkit command
 * Swap apt-proxy for something that also caches downoads from virutal machines
   (it currently gives bad header lines which seems to be a known, yet
-  unresolved issue)
+  unresolved issue) so there is no caching of install packages used in the
+  VMs.
 
-More help
-=========
+More buildkit help
+==================
 
 More documentation to come, at the moment you can work out most of what you
 need by browsing the online help starting at:

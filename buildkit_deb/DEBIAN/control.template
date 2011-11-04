@@ -3,7 +3,7 @@ Priority: extra
 Maintainer: James Author <author@example.com>
 Homepage: http://jimmyg.org/james
 Package: buildkit
-Version: 0.1.0+01+lucid
+Version: 0.2.0+01+lucid
 Architecture: all
 Depends: ubuntu-vm-builder, python-vm-builder, gawk, kvm, sed, findutils, rsync, apache2, reprepro, gnupg, wget, dh-make, devscripts, build-essential, fakeroot, alien, cdbs, python-pip, python-virtualenv, subversion, mercurial, git-core, python-buildkit, apt-proxy, kvm-pxe, uml-utilities
-Description: Tools for managing the creating and testing of Python eggs and documentation
+Description: Cloud infrastructure and .deb file management software
