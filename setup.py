@@ -34,16 +34,15 @@ setup(
     # Get classifiers from http://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         'Development Status :: 3 - Alpha',
-        #'Environment :: Web Environment',
         'License :: OSI Approved :: GNU Affero General Public License v3',
         'Programming Language :: Python',
     ],
     keywords='',
     author='James Gardner',
     author_email='',
-    url='http://jimmyg.org/work/code/buildkit/index.html',
+    url='http://packages.python.org/buildkit',
     license='GNU AGPLv3',
-    packages=find_packages(exclude=['ez_setup', 'example', 'test']),
+    packages=find_packages(exclude=['example', 'test']),
     include_package_data=True,
     zip_safe=False,
     install_requires=[

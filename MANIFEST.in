@@ -14,4 +14,4 @@ include ez_setup.py
 include CHANGELOG.txt
 include LICENSE.txt
 
-recursive-include buildkit_deb
+recursive-include *_deb *

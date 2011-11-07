@@ -89,6 +89,8 @@ include example/README.txt
 include ez_setup.py
 include CHANGELOG.txt
 include LICENSE.txt
+
+recursive_include *_deb *
 ''',
     'CHANGELOG.txt': '''Changes
 =======

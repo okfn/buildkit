@@ -15,7 +15,7 @@ BuildKit is really 4 pieces of software in one. It has code for
 * running Python tests and generating both Python ``.egg`` and source releases for a package
 * setting up and managing a sophisticated test and release infrastructure using Debian packages, Debian apt repositories and KVM virtualisation
 
-Other tools also to some of these things. For example, you may also be interested in:
+Other tools also do some of these things. For example, you may also be interested in:
 
 ``python-apt``
 
@@ -40,6 +40,17 @@ Buildkit Tutorial
 
    Buildkit only works on Ubuntu 10.04 LTS. Any other platform is untested and vitually guaranteed to break. Only use on Ubuntu 10.04.
 
+   Also note that for the VM funtionality to work, you will need virtualisation CPU extensions. You can check you have the necessary support like this:
+
+   ::
+       $ sudo apt-get install kvm
+       $ kvm-ok
+       INFO: Your CPU supports KVM extensions
+       INFO: /dev/kvm exists
+       KVM acceleration can be used
+
+    You can create a VM without KVM support but you won't be able to run it.
+
 BuildKit is installed as a Debian package so the first thing you need to do is
 to use it to create a debian package from the source.
 
@@ -51,7 +62,7 @@ like this:
 
 ::
 
-    sudo apt-get install ubuntu-vm-builder python-vm-builder gawk kvm sed findutils rsync apache2 reprepro gnupg wget dh-make devscripts build-essential fakeroot alien cdbs python-pip python-virtualenv subversion mercurial git-core python-buildkit apt-proxy kvm-pxe uml-utilities
+    sudo apt-get install ubuntu-vm-builder python-vm-builder gawk kvm sed findutils rsync apache2 reprepro gnupg wget dh-make devscripts build-essential fakeroot alien cdbs python-pip python-virtualenv subversion mercurial git-core apt-proxy kvm-pxe uml-utilities
 
 When the email configuration pops up choose "Internet Site" then accept the
 hostname suggested (or choose your own).
@@ -131,7 +142,8 @@ running apt-proxy, in this case your local machine):
 
 ::
 
-    sudo buildkit vm create --proxy 192.168.0.6 -o /var/lib/buildkit/vm/ 10
+    IP=`/sbin/ifconfig $NETWORK_DEVICE | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}' | grep -v "127.0.0.1" | grep -v "192.168.100."`
+    sudo buildkit vm create --proxy $IP -o /var/lib/buildkit/vm/ 10
 
 You can check that apt-proxy has been used like this:
 
@@ -149,8 +161,11 @@ a new VM. Let's keep this one as a base VM:
 
 ::
 
-    export IMAGE=`sudo ls /var/lib/buildkit/vm/buildkit10/ | awk '{print $0}' | grep -v "run.sh"`
+    export IMAGE=`sudo ls /var/lib/buildkit/vm/buildkit10/ | awk '{print $0}' | grep -v "run.sh" | grep -v "disk.raw"`
     sudo cp -p /var/lib/buildkit/vm/buildkit10/${IMAGE} /var/lib/buildkit/vm/base.qcow2
+
+You can always just copy the VM manually too, you just have to find out what
+the image name is in the ``buildkit10`` directory.
 
 Whenever you want a new VM you can then just run:
 
@@ -202,7 +217,27 @@ build a base VM using the ``buildkit vm create`` command as described above).
 The individual buildkit commands that are needed to build CKAN are specified in
 the ``build.sh`` script so you should take a look at that. 
 
-Now on to the packaging.
+Creating an apt repository
+--------------------------
+
+The ``build.sh`` script exports all the ``.deb`` files that are created to an
+apt repository on your local machine that is hosted by Apache and set up as
+part of the buildkit install. Before you can run the script you need to create
+the repository that will be used:
+
+::
+
+    sudo -u buildkit buildkit repo clone /var/lib/buildkit/repo/base_lucid ckan-1.5
+
+Check that there are no packages in the repository yet:
+
+::
+
+    sudo -u buildkit buildkit repo list /var/lib/buildkit/repo/ckan-1.5
+
+There shouldn't be any output.
+
+Now on to the packaging itself.
 
 Packaging
 ---------
@@ -213,7 +248,7 @@ Run the build (not as root) like this:
 
 ::
 
-    ./build
+    ./build.sh
 
 At the end of the build you'll be prompted for your password so that ``sudo``
 can import the packages into the buildkit repository on your local machine to
@@ -244,7 +279,41 @@ After a few moments you can start your VM (tip: be sure to specify the correct n
 Here I'm giving the VM 1024M and letting it use 4 CPUs. For a production CKAN
 you should have at least 1.5Gb of RAM.
 
-Now you can connect from the host to the guest over SSH:
+.. tip ::
+
+    If a QEMU window appears but nothing happens after a few seconds it is
+    likely your CPU doesn't support virtualisation extensions needed by KVM. Run
+    the ``kvm-ok`` command mentioned earlier to check.
+
+    If KVM isn't supported you could try using virtualbox instead. Start by 
+    installing VirtualBox:
+
+    ::
+
+        sudo apt-get install virtualbox-ose
+        sudo rmmod kvm-intel
+        # Or if you have an AMD machine:
+        # sudo rmmod kvm-amd
+
+    Then convert the disk image to a ``.vdi`` file:
+
+    ::
+
+        sudo -u buildkit qemu-img convert -f qcow2 -O vdi /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/ckan/disk.vdi
+
+    Then use the interface to create a new Ubuntu 10.04 machine with this disk
+    image as its base. The networking setup will be different if you use virtualbox
+    and you'll need to edit the various ``/etc/hosts`` files yourself to be able to
+    test your CKAN install, but if you are a virtualbox expert, it should be
+    possible.
+
+    See here for a port forwarding approach that is useful: http://jimmyg.org/blog/2008/ssh-to-a-debian-etch-virtual-machine-in-virtualbox.html
+
+    The alternative is just to install CKAN onto your host machine for testing
+    and not worry about VMs at all.
+
+Assuming the ``buildkit-vm-start`` command worked you can now connect from the
+host to the guest over SSH:
 
 ::
 
@@ -278,12 +347,13 @@ upgrade the core packages at this point:
     sudo apt-get update
     sudo apt-get upgrade -y
     
-At this point you can install the ckan package from within the VM. When you
-start the VM, the hostame ``host.buildkit`` is set up to point to the host
-server. The Apache configuration for the host server is set up serve the apt
-repo from the ``host.buildkit`` server alias so the commands below will set up
-access the host repo. The ``sudo`` password is ``ubuntu`` by default as already
-mentioned. Run the commands now:
+At this point you can install the ckan package from within the VM (or on your
+local machine if you prefer). When you start the VM, the hostame
+``host.buildkit`` is set up to point to the host server. The Apache
+configuration for the host server is set up serve the apt repo from the
+``host.buildkit`` server alias so the commands below will set up access the
+host repo. The ``sudo`` password is ``ubuntu`` by default as already mentioned.
+Run the commands now:
 
 ::
 
