@@ -6,7 +6,7 @@ Manual
 Differences To Other Software
 =============================
 
-BuildKit is really 4 pieces of software in one. It has code for 
+BuildKit is really 4 pieces of software in one. It has code for
 
 * creating a template from a directory structure that can be used to generate similar directory structures
 * generating an empty Python package set up for use with ``pip``, ``sphinx`` and ``pypi`` with tests, doctests and packagable as a ``.deb`` file
@@ -23,7 +23,7 @@ Other tools also do some of these things. For example, you may also be intereste
 
 ``alien``
 
-    Can automatically build a ``.deb`` from a Python package 
+    Can automatically build a ``.deb`` from a Python package
     build with ``python setup.py bdist``.
 
 Buildkit also used to do:
@@ -96,7 +96,7 @@ You'll most likely see this as part of the install:
     gpg: Generating a basic OpenPGP key for buildkit, THIS CAN TAKE A FEW MINUTES if there is not enough entropy ...
     gpg: skipping control `%no-protection' ()
     .+++++++++++++++.++++++++++..++++++++++++++++++++.++++++++++.++++++++++++++++++++++++++++++.++++++++++.++++++++++++++++++++..+++++.++++++++++>.++++++++++.....................................+++++
-    
+
     Not enough random bytes available.  Please do some other work to give
     the OS a chance to collect more entropy!  (Need 280 more bytes)
 
@@ -172,7 +172,7 @@ Whenever you want a new VM you can then just run:
 ::
 
     sudo -u buildkit qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/new/disk.raw
-    
+
 This converts from the small .qcow2 file to a fresh ``disk.raw`` image.
 
 Now let's start it (change eth1 for your network interface):
@@ -206,7 +206,7 @@ First you need to get the source code for the version you want to package:
 
 ::
 
-    hg clone -r release-v1.5 https://bitbucket.org/okfn/ckan/ 
+    hg clone -r release-v1.5 https://bitbucket.org/okfn/ckan/
 
 Next you need to install buildkit, either from source (as described above) or
 from an apt-repository where it is hosted. Once it is installed you'll have an
@@ -215,7 +215,7 @@ command and the ability to boot virtual machines for testing. (You'll need to
 build a base VM using the ``buildkit vm create`` command as described above).
 
 The individual buildkit commands that are needed to build CKAN are specified in
-the ``build.sh`` script so you should take a look at that. 
+the ``build.sh`` script so you should take a look at that.
 
 Creating an apt repository
 --------------------------
@@ -285,7 +285,7 @@ you should have at least 1.5Gb of RAM.
     likely your CPU doesn't support virtualisation extensions needed by KVM. Run
     the ``kvm-ok`` command mentioned earlier to check.
 
-    If KVM isn't supported you could try using virtualbox instead. Start by 
+    If KVM isn't supported you could try using virtualbox instead. Start by
     installing VirtualBox:
 
     ::
@@ -346,7 +346,7 @@ upgrade the core packages at this point:
 
     sudo apt-get update
     sudo apt-get upgrade -y
-    
+
 At this point you can install the ckan package from within the VM (or on your
 local machine if you prefer). When you start the VM, the hostame
 ``host.buildkit`` is set up to point to the host server. The Apache
@@ -369,8 +369,8 @@ Run the commands now:
     The last line in the commands above installs CKAN, the PostgreSQL database
     engine, and the Solr search index server. If you intend to connect to a PostgreSQL or
     Solr server that is running on a different machine you don't need to
-    install them. In that case, when you run the ``ckan-create-instance`` command later, 
-    choose ``"no"`` as the third parameter to tell the install command not to 
+    install them. In that case, when you run the ``ckan-create-instance`` command later,
+    choose ``"no"`` as the third parameter to tell the install command not to
     set up or configure the PostgreSQL database for CKAN. You'll then need to perform any
     database creation and setup steps manually yourself.
 
@@ -421,7 +421,7 @@ Instance name
 
     This should be a short letter only string representing the name of the CKAN
     instance. It is used (amongst other things) as the basis for:
-    
+
     * The directory structure of the instance in ``/var/lib/ckan``, ``/var/log/ckan``, ``/etc/ckan`` and elsewhere
     * The name of the PostgreSQL database to use
     * The name of the Solr core to use
@@ -461,183 +461,12 @@ Create a new instance like this:
 You'll need to specify a new instance name and different hostname for each CKAN
 instance you set up.
 
-Don't worry about warnings you see like this during the creation process, they are harmless:
-
-::
-
-    /usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/reflection.py:46: SAWarning: Did not recognize type 'tsvector' of column 'search_vector' ret = fn(self, con, *args, **kw)
-
 You can now access your CKAN instance from your host machine as http://default.vm.buildkit/
 
 .. tip ::
 
-    If you get taken straight to a login screen it is a sign that the PostgreSQL
-    database initialisation may not have run. Try running:
- 
-    ::
- 
-        INSTANCE=std
-        sudo paster --plugin=ckan db init --config=/etc/ckan/${INSTANCE}/${INSTANCE}.ini
- 
-    If you specified ``"no"`` as part of the ``create-ckan-instance`` you'll
-    need to specify database and solr settings in ``/etc/ckan/std/std.ini``. At the
-    moment you'll see an "Internal Server Error" from Apache. You can always
-    investigate such errors by looking in the Apache and CKAN logs for that
-    instance. For example (leading data stripped for clarity):
- 
-    ::
- 
-        $ sudo -u ckanstd tail -f /var/log/ckan/std/std.log
-        WARNI [vdm] Skipping adding property Package.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property PackageTag.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property Group.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property PackageGroup.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property GroupExtra.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property PackageExtra.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property Resource.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property ResourceGroup.resources_all to revisioned object
-        WARNI [vdm] Skipping adding property ResourceGroup.all_revisions_unordered to revisioned object
-        WARNI [vdm] Skipping adding property PackageRelationship.all_revisions_unordered to revisioned object
- 
-    No error here, let's look in Apache (leading data stripped again):
- 
-    ::
- 
-        $ tail -f /var/log/apache2/std.error.log
-            self.connection = self.__connect()
-          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/pool.py", line 319, in __connect
-            connection = self.__pool._creator()
-          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/strategies.py", line 82, in connect
-            return dialect.connect(*cargs, **cparams)
-          File "/usr/lib/pymodules/python2.6/ckan/sqlalchemy/engine/default.py", line 249, in connect
-            return self.dbapi.connect(*cargs, **cparams)
-        OperationalError: (OperationalError) FATAL:  password authentication failed for user "ckanuser"
-        FATAL:  password authentication failed for user "ckanuser"
-         None None
- 
-    There's the problem, you need to set up the ``sqlalchemy.url`` option in the
-    config file. Edit it to set the correct settings:
- 
-    ::
- 
-        sudo -u ckanstd vi /etc/ckan/std/std.ini
-
-Each instance you create has its own virtualenv that you can install extensions
-into at ``/var/lib/ckan/std/pyenv`` and its own system user, in this case
-``ckanstd``.  Any time you make changes to the virtualenv, you should make sure
-you are running as the correct user otherwise Apache might not be able to load
-CKAN.  For example, say you wanted to install a ckan extension, you might run:
-
-::
-
-    sudo -u ckanstd /var/lib/ckan/std/pyenv/bin/pip install <name-of-extension>
-
-You can now configure your instance by editing ``/etc/ckan/std/std.ini``:
-
-::
-
-    sudo -u ckanstd vi /etc/ckan/std/std.ini
-
-After any change you can touch the ``wsgi.py`` to tell Apache's mod_wsgi that
-it needs to take notice of the change for future requests:
-
-::
-
-    sudo touch /var/lib/ckan/std/wsgi.py
-
-Or you can of course do a full restart if you prefer:
-
-::
-
-    sudo /etc/init.d/apache2 restart
-
-Browsers seem to cache the homepage so if you make a change, always do a full
-browser refresh by holding down shift or ctrl.
-
-One of the key things it is good to set first is the ``ckan.site_description``
-option. The text you set there appears in the banner at the top of your CKAN
-instance's pages.
-
-.. tip ::
-
-    If you want to be able to access the instance from the VM itself for testing
-    purposes using ``elinks`` or similar, you'll need to update the ``/etc/hosts``
-    file on the VM so that the ``127.0.0.1`` line includes ``default.vm.buildkit``:
-
-    :: 
-
-        127.0.0.1 localhost default.vm.buildkit
-
-    You can now run:
-
-    ::
-
-        sudo apt-get install -y elinks
-        elinks http://default.vm.buildkit/
-
-You can enable and disable particular CKAN instances by running:
-
-::
-
-    sudo a2ensite std
-    sudo /etc/init.d/apache2 reload
-
-or:
-
-::
-
-    sudo a2dissite std
-    sudo /etc/init.d/apache2 reload
-
-respectively.
-
-
-Detailed CKAN (Not relevant to BuildKit per-se)
------------------------------------------------
-
-Let's get used to some of the CKAN command line tools.
-
-To begin working with it let's set up a user and some permissions. You can
-create an account via the web interface but as a demo let's first create an
-admin account from the command line:
-
-::
-
-    $ sudo paster --plugin=ckan user add admin --config=/etc/ckan/std/std.ini
-    No handlers could be found for logger "vdm"
-    Creating user: 'admin'
-    Password:
-    Confirm password:
-    <User id=9c0180ab-c239-4f00-bd3d-538635192f74 name=admin openid=None password=fb10b7015dfe85a694cbebec1bfed8f18517c841fa4392430805c050fff27a09e35043972c8b4e1d fullname=None email=None apikey=e6fead47-636a-426d-b30a-37f61fa6fdc4 created=2011-06-27 13:52:08.141205 about=None>
-
-The password you enter will be the one you need to login with in CKAN. Notice
-that you also get assigned a CKAN API key, in this case it was
-e6fead47-636a-426d-b30a-37f61fa6fdc4.
-
-For exploratory purposes, you might as well make the admin user a sysadmin. You
-obviously wouldn't give most users these rights as they would then be able to
-do anything. You can make the admin user a sysadmin like this:
-
-::
-
-    $ sudo paster --plugin=ckan sysadmin add admin --config=/etc/ckan/std/std.ini
-    No handlers could be found for logger "vdm"
-    
-    Added admin as sysadmin
-
-You can now login to the CKAN frontend with the username admin and the password you set up.
-Finally, it can be handy to have some test data to start with. You can get test data like this:
-
-::
-
-    $ sudo paster --plugin=ckan create-test-data --config=/etc/ckan/std/std.ini
-
-Now you should be up and running.
-
-Tidy-ups to expect in the next CKAN release:
-
-* Removal of ``ckan/MIGRATE.txt``
-* Removal of all code that depends on FormAlchemy and its dependencies
+    More detailed CKAN instructions are available via the "Package Documentation"
+    link at http://pypi.python.org/pypi/ckan/.
 
 Potential Packaging Issues
 ==========================
@@ -648,7 +477,7 @@ There are some gotchas to be aware of with ``buildkit`` so far:
   content. It is therefore best to never have information in ``__init__.py``
   files which is why, for extensions, we now have plugins implemented in
   ``plugin.py`` rather than ``__init__.py``.
-* Packaging sometimes strips our key directories, such as any named ``dist``, 
+* Packaging sometimes strips our key directories, such as any named ``dist``,
   they just won't be present in the packaged version.
 
 A future implementation of the packaging may be able to address these
@@ -657,7 +486,7 @@ enhancements:
 
 * Creating a new instance could also automatically restore from any latest
   dumps that existed for that instance
-* When "conflict" functionality is used in the Python packaging, the code is copied 
+* When "conflict" functionality is used in the Python packaging, the code is copied
   directly into the main project. At the moment it is the packager's
   responsibility to ensure that the licenses of those conflicting modules are
   copied into the main license for the overall package. It would be nice if the

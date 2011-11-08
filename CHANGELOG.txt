@@ -1,6 +1,19 @@
 Changes
 =======
 
+0.2.1
+-----
+
+2011-11-08
+~~~~~~~~~~
+
+* Added a ``buildkit release`` command to update version numbers within a 
+  buildkit-generated Python project directory structure
+* Updated the documentation to clarify some aspects of the install
+* Included the ``buildkit_deb`` directory in the source distribution and
+  updated the ``MANIFEST.in`` file template so that when a project is
+  generated it will include the Debian directory
+
 0.2.0
 -----
 
