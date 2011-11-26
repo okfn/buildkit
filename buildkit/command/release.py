@@ -4,7 +4,7 @@ Change the package version numbers in a Python source tree
 
 import datetime
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -48,10 +48,10 @@ def replace(filename, old, new, variable='version'):
         '-i',
         filename,
     ]
-    facilify.process(command)
+    stacks.process(command)
 
 def run(cmd):
-    base_dir = facilify.uniform_path(cmd.args[0])
+    base_dir = stacks.uniform_path(cmd.args[0])
 
     if not os.path.exists(base_dir):
         cmd.err("ERROR: No such directory %r", base_dir)
@@ -92,7 +92,7 @@ def run(cmd):
     if not os.path.exists(changelog):
         cmd.err('Skipping %r, file not found', changelog)
     else:
-        data = facilify.file_contents(changelog)
+        data = stacks.file_contents(changelog)
         if '%s\n%s'%(cmd.args[2], '-'*len(cmd.args[2])) in data:
             cmd.err('Skipping %r, aready has a %s section', changelog, cmd.args[2])
         else:

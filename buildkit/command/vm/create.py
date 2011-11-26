@@ -4,7 +4,7 @@ Create a virtual machine
 
 import os
 import socket
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -87,7 +87,7 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
     for package in packages:
         cmd_ += '--addpkg '+package
     cmd.out(cmd_)
-    result = facilify.process(
+    result = stacks.process(
         cmd_,
         shell=True, 
         cwd=output_dir,
@@ -108,7 +108,7 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
         cmd.out('Converting to raw ...')
         cmd_ = 'qemu-img convert -f qcow2 -O raw %s %s/disk.raw'%(qcow2, new_output_dir)
         cmd.out(cmd_)
-        result = facilify.process(
+        result = stacks.process(
             cmd_,
             shell=True,
             echo=True,
@@ -140,7 +140,7 @@ def run(cmd):
     if vm_ip_part in ['0','1','255','254']:
         cmd.err('The VM IP address cannot end with .%s', host_ip_part)
         return 1
-    opts = facilify.str_keys(cmd.opts, ignore=['help', 'proxy_ip'])
+    opts = stacks.str_keys(cmd.opts, ignore=['help', 'proxy_ip'])
     base_ip='.'.join(vm_ip.split('.')[:3])
     result = build(cmd, vm_ip_part, base_ip, proxy_ip=proxy_ip, arch=cmd.dist.determine_arch(), **opts)
     

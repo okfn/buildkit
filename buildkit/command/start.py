@@ -60,7 +60,7 @@ Then you'll be able to run commands like these:
 
 import datetime
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -81,7 +81,7 @@ arg_specs = [
     ),
 ]
 
-opt_specs_by_name = facilify.OrderedDict(
+opt_specs_by_name = stacks.OrderedDict(
     package = dict(
         flags = ['-p', '--package'],
         help_msg = 'Name of the new package',
@@ -183,7 +183,7 @@ def run(cmd):
     #elif not cmd.opts.author_name or not cmd.opts.author_email:
     #    cmd.err('ERROR: You must specify `--author-name\' and `--author-email\' when using `--hg\', `--git\' or `--git-flow\'')
     #    return 1
-    opts = facilify.strip_none(cmd.opts)
+    opts = stacks.strip_none(cmd.opts)
     opts['module'] = cmd.args[0]
     opts['description'] = cmd.args[1]
     opts['distro_depends'] = ", ".join(cmd.opts.distro_depends)

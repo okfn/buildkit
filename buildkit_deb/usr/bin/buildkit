@@ -2,12 +2,12 @@
 
 import sys
 from buildkit.run import run_args
-from buildkit import facilify
+from buildkit import stacks
 
 if __name__ == '__main__':
     if not len(sys.argv) > 1:
         print "Please choose a command or type 'buildkit --help' for more information"
         sys.exit(1)
-    result = facilify.run(**run_args)
+    result = stacks.run(**run_args)
     sys.exit(result)
 

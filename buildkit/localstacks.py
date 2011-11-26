@@ -30,7 +30,7 @@ else:
 from pprint import pprint
 import logging
 import StringIO
-log = logging.getLogger('facilify')
+log = logging.getLogger('stacks')
 
 def pretty(var):
     stream = StringIO.StringIO()
@@ -525,7 +525,7 @@ class Unusable(object):
     some particular internal state, but where you don't expect a user of your
     API to actually access that placeholder. 
 
-    In facilify, this class is used to create the ``missing``, ``empty_list``
+    In stacks, this class is used to create the ``missing``, ``empty_list``
     and ``extra_keys`` that are used as part of the ``validate()`` funcitons
     processing.
 
@@ -561,9 +561,9 @@ class Unusable(object):
 
 Missing = ExtraKeys = EmptyList = Unusable
 
-missing = Missing('Missing value', 'facilify.missing')
-empty_list = EmptyList('Empty list', 'facilify.empty_list')
-extra_keys = ExtraKeys('Extra keys', 'facilify.extra_keys')
+missing = Missing('Missing value', 'stacks.missing')
+empty_list = EmptyList('Empty list', 'stacks.empty_list')
+extra_keys = ExtraKeys('Extra keys', 'stacks.extra_keys')
 
 class StopOnError(Exception):
     '''error to stop validations for a particualar key'''
@@ -639,7 +639,7 @@ def flatten_dict(augmented_data, schema):
     ::
 
         >>> flatten_dict(OrderedDict({"one": 1, "two":[], "three": {}, "four": empty_list}), schema)
-        [(('four',), <facilify.empty_list object at 0x...>), (('three',), {}), (('two',), []), (('one',), 1)]
+        [(('four',), <stacks.empty_list object at 0x...>), (('three',), {}), (('two',), []), (('one',), 1)]
         >>> flatten_dict({"one": [{"two": {'data': 'dict'}}]}, schema)
         [(('one', 0, 'two'), {'data': 'dict'})]
 
@@ -681,11 +681,11 @@ def augment(dict_data, schema):
         >>> data['one'][0]['two'][0][extra_keys] == {'four': 3}
         True
         >>> print pretty(flatten_dict(data, schema)),
-        [(('one', 0, 'two', 0, <facilify.extra_keys object at 0x...>),
+        [(('one', 0, 'two', 0, <stacks.extra_keys object at 0x...>),
           {'four': 3}),
          (('one', 0, 'two', 0, 'three'), 
-         <facilify.missing object at 0x...>),
-         (('one', 1, 'two'), <facilify.empty_list object at 0x...>)]
+         <stacks.missing object at 0x...>),
+         (('one', 1, 'two'), <stacks.empty_list object at 0x...>)]
 
     """
     log.debug('Augmenting %r according to %r', dict_data, schema)
@@ -784,9 +784,9 @@ def unaugment(dict_data, schema):
         >>> augment(data, schema)
         >>> print pretty(data),
         {'one': [{'two': [{'three': 3}]},
-                 {'two': <facilify.empty_list object at 0x...>},
-                 {<facilify.extra_keys object at 0x...>: {'four': 4},
-                  'two': <facilify.missing object at 0x...>}]}
+                 {'two': <stacks.empty_list object at 0x...>},
+                 {<stacks.extra_keys object at 0x...>: {'four': 4},
+                  'two': <stacks.missing object at 0x...>}]}
         >>> result = unaugment(data, schema)
         >>> result == {
         ...     'one': [
@@ -844,17 +844,17 @@ def unaugment(dict_data, schema):
         {'one': [{'two': [{'three': ['random', 'list', 1, {'dict': 'data'}]}]},
                  {'two': [{'three': {'dict': 'data'}}]},
                  {'two': [{'three': 3}]},
-                 {'two': <facilify.empty_list object at 0x...>},
-                 {<facilify.extra_keys object at 0x...>: {'four': 4},
-                  'two': <facilify.missing object at 0x...>}]}
+                 {'two': <stacks.empty_list object at 0x...>},
+                 {<stacks.extra_keys object at 0x...>: {'four': 4},
+                  'two': <stacks.missing object at 0x...>}]}
         >>> flat = flatten_dict(data, schema)
         >>> print pretty(flat),
         [(('one', 0, 'two', 0, 'three'), ['random', 'list', 1, {'dict': 'data'}]),
          (('one', 1, 'two', 0, 'three'), {'dict': 'data'}),
          (('one', 2, 'two', 0, 'three'), 3),
-         (('one', 3, 'two'), <facilify.empty_list object at 0x...>),
-         (('one', 4, <facilify.extra_keys object at 0x...>), {'four': 4}),
-         (('one', 4, 'two'), <facilify.missing object at 0x...>)]
+         (('one', 3, 'two'), <stacks.empty_list object at 0x...>),
+         (('one', 4, <stacks.extra_keys object at 0x...>), {'four': 4}),
+         (('one', 4, 'two'), <stacks.missing object at 0x...>)]
         >>> result = unaugment(data, schema)
         >>> result == {
         ...     'one': [
@@ -2129,7 +2129,7 @@ def handle_command(
 
     ``definition``
         The definition of the command to use as the main
-        command. Most of the time this is ``facilify.logging_command`` which
+        command. Most of the time this is ``stacks.logging_command`` which
         provides basic logging facility_specs.
 
     ``name``
@@ -2174,11 +2174,11 @@ def handle_command(
 
     ``out``,
         A custom function that should be used instead of the default
-        ``facilify.print_fn`` for output to stdout via the ``command.out()`` call.
+        ``stacks.print_fn`` for output to stdout via the ``command.out()`` call.
 
     ``err``
         A custom function that should be used instead of the default
-        ``facilify.print_fn`` for output to err via the ``command.err()`` call.
+        ``stacks.print_fn`` for output to err via the ``command.err()`` call.
 
     ``help_opt_name``
        The name of the option, which if present should trigger automatic display
@@ -3234,7 +3234,7 @@ Run the tests as follows:
 
 ::
 
-    cd facilify/test
+    cd stacks/test
     python run.py
 
 Run the coverage check as follows:
@@ -3248,9 +3248,9 @@ Write a test like this:
 
 ::
 
-    import facilify
+    import stacks
     
-    class TestUpdate(facilify.TestCase):
+    class TestUpdate(stacks.TestCase):
     
         def test_01_shared_present(self):
             self.assertEqual(self.shared.config, {})
@@ -3271,18 +3271,18 @@ Here's the run.py file:
 
         # Normal doctests
         import doctest
-        doctest.testmod(facilify, optionflags=doctest.ELLIPSIS)
+        doctest.testmod(stacks, optionflags=doctest.ELLIPSIS)
         doctest.run_docstring_examples(
-            facilify.parse_argv, facilify.__dict__
+            stacks.parse_argv, stacks.__dict__
         )
 
         # Facilify tests
-        import facilify
-        shared = facilify.SharedStack(...)
-        testLoader = facilify.TestLoader(shared)
-        facilify.TestProgram(testLoader, module="facilify.test.command")
-        facilify.TestProgram(testLoader, module="facilify.test.ordered_dict")
-        facilify.TestProgram(testLoader, module="facilify.test.facilities")
+        import stacks
+        shared = stacks.SharedStack(...)
+        testLoader = stacks.TestLoader(shared)
+        stacks.TestProgram(testLoader, module="stacks.test.command")
+        stacks.TestProgram(testLoader, module="stacks.test.ordered_dict")
+        stacks.TestProgram(testLoader, module="stacks.test.facilities")
 
 """
 

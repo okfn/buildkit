@@ -11,7 +11,7 @@ import sys
 import time
 import types
 import datetime
-from buildkit import facilify
+from buildkit import stacks
 from buildkit.facility.build import get_pkg_info
 
 def clone(
@@ -29,7 +29,7 @@ def clone(
     msg = 'Get repo for "%s" source' % repo_name
     if os.path.exists(hgrc_filepath):
         repo.log.info(msg)
-        facilify.process(
+        stacks.process(
             'hg -R %(repo_dir)s pull'%dict(
                 repo_url=repo_url, 
                 repo_dir=repo_dir, 
@@ -37,7 +37,7 @@ def clone(
             ),
             shell=True,
         )
-        facilify.process(
+        stacks.process(
             'hg -R %(repo_dir)s up -r %(revision)s'%dict(
                 repo_url=repo_url, 
                 repo_dir=repo_dir, 
@@ -47,7 +47,7 @@ def clone(
         )
     else:
         repo.log.info(msg)
-        facilify.process(
+        stacks.process(
             'hg clone %(repo_url)s -r %(revision)s %(repo_dir)s' % dict(
                  repo_url=repo_url,
                  repo_dir=repo_dir,
@@ -190,7 +190,7 @@ def get_dependencies(
     missing_deps = ', '.join(result)
     if missing_deps:
         repo.log.info('    Non-Ubuntu Python dependencies are: %r', missing_deps)
-    return facilify.obj(
+    return stacks.obj(
         present_deps=present_deps, 
         missing_deps=missing_deps, 
         unbuilt=unbuilt,
@@ -201,7 +201,7 @@ def parse_control_file(path):
     fp = open(path, 'r')
     content = fp.read().split('\n')
     fp.close()
-    control = facilify.OrderedDict()
+    control = stacks.OrderedDict()
     for line in content:
         if line.strip() and not line.strip().startswith('#') and not line.startswith(' '):
             parts = line.strip().split(': ')

@@ -11,7 +11,7 @@ See the full documentation in ``../doc/source/manual.rst`` and the example in ``
 
 import os
 import base64
-from buildkit import facilify
+from buildkit import stacks
 
 def replace(generate, string, replacements, vars_used):
     used = []
@@ -40,11 +40,11 @@ def exclude(
 ):
     exclude = False
     for exclude_path in exclude_paths:
-        if facilify.uniform_path(path) == exclude_path:
+        if stacks.uniform_path(path) == exclude_path:
             exclude = True
             break
         elif exclude_path.endswith('/') and \
-           facilify.uniform_path(path).startswith(exclude_path):
+           stacks.uniform_path(path).startswith(exclude_path):
             exclude = True
             break
     return exclude
@@ -57,7 +57,7 @@ def prepare(
     exclude_paths=[],
     binary_extensions=[],
 ):
-    exclude_paths = [facilify.uniform_path(path) for path in exclude_paths]
+    exclude_paths = [stacks.uniform_path(path) for path in exclude_paths]
     if not os.path.exists(start_path) or not os.path.isdir(start_path):
         raise Exception('No such directory %r'%start_path)
     if replacements is None:
@@ -84,12 +84,12 @@ def prepare(
             path = os.path.join(dirpath, dirname)
             if generate.exclude(exclude_paths, path):
                 continue
-            relpath = facilify.relpath(path, start_path)
+            relpath = stacks.relpath(path, start_path)
             if path and not path in paths:
                 paths.append(relpath)
         for filename in filenames:
             path = os.path.join(dirpath, filename)
-            relpath = facilify.relpath(path, start_path)
+            relpath = stacks.relpath(path, start_path)
             if generate.exclude(exclude_paths, path):
                 continue
             ext = filename.split('.')[-1]
@@ -124,7 +124,7 @@ def prepare(
                 failed_to_use,
             )
         )
-    return facilify.obj(
+    return stacks.obj(
         templates = templates,
         paths = paths,
         vars_used = vars_used,

@@ -14,7 +14,7 @@ import types
 import datetime
 import pkg_resources
 from wsgiref.handlers import _weekdayname, _monthname
-from buildkit import facilify
+from buildkit import stacks
 from buildkit.facility.build import get_pkg_info
 
 log = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def parse_control_file(path):
     fp = open(path, 'r')
     content = fp.read().split('\n')
     fp.close()
-    control = facilify.OrderedDict()
+    control = stacks.OrderedDict()
     key = None
     for line in content:
         if line.strip() and not line.strip().startswith('#') and not line.startswith(' '):
@@ -130,7 +130,7 @@ def prepare_build_dir(
         mv %(package)s-%(full_version)s python-%(package)s-%(full_version)s
     """%template_vars)
     #log.info(cmd)
-    result = facilify.process(
+    result = stacks.process(
         cmd,
         shell=True,
         cwd=src_dir,
@@ -173,7 +173,7 @@ def make_debian_dir(
         rm README.source
     """%template_vars)
     #log.info(cmd)
-    result = facilify.process(
+    result = stacks.process(
         cmd,
         shell=True,
         cwd=build_dir,
@@ -331,7 +331,7 @@ def build_package(
     package, 
     full_version, 
 ):
-    return facilify.process(
+    return stacks.process(
         """
         export DEBFULLNAME="James Gardner"
         export DEBEMAIL="james.gardner@okfn.org"
@@ -411,7 +411,7 @@ def copy_package(
             shutil.copyfile(src, dst)
         except OSError, e:
             error = ' Failed: Could not copy %r to %r: %s' %(src, dst, e)
-    return facilify.obj(error=error, dst=dst)
+    return stacks.obj(error=error, dst=dst)
 
 def deps(
     dist, 
@@ -505,7 +505,7 @@ def deps(
                 src,
                 dst,
             )
-    return facilify.obj(
+    return stacks.obj(
         present_error=present_error,
         missing_error=missing_error,
         present_deps=present_deps, 
@@ -529,11 +529,11 @@ def parse_deps(
     pip = {}
     pip_path = os.path.join(build_env_dir, 'bin', 'pip')
     if not os.path.exists(pip_path):
-        result = facilify.process(['virtualenv', build_env_dir], merge=True)
+        result = stacks.process(['virtualenv', build_env_dir], merge=True)
         if result.retcode:
             dist.log.error(result.stdout)
             raise Exception('Failed to create a virtual environment in %r'%build_env_dir)
-        result = facilify.process(
+        result = stacks.process(
             [
                 pip_path,
                 'install',
@@ -549,7 +549,7 @@ def parse_deps(
     if not os.path.exists(cache_path):
         os.mkdir(cache_path)
     if os.path.exists(os.path.join(src_dir, rel_requires_path)):
-        for line in facilify.file_contents(os.path.join(src_dir, rel_requires_path)).split('\n'):
+        for line in stacks.file_contents(os.path.join(src_dir, rel_requires_path)).split('\n'):
             if not line.strip() or line.strip().startswith('#'):
                 continue
             if line.strip().startswith('-e'):
@@ -564,7 +564,7 @@ def parse_deps(
                     '--ignore-installed', 
                     '-e', requirement,
                 ]
-                result = facilify.process(
+                result = stacks.process(
                     cmd_,
                     merge=True,
                 )
@@ -627,7 +627,7 @@ def parse_deps(
                             requirement,
                         ]
                     dist.log.info(' '.join(cmd_))
-                    result = facilify.process(
+                    result = stacks.process(
                         cmd_,
                         merge=True,
                     )
@@ -650,7 +650,7 @@ def parse_deps(
                 pip[tup] = requirement
     else:
         error = 'No such file %r'%(os.path.join(path, rel_requires_path))
-    return facilify.obj(
+    return stacks.obj(
         distro=distro,
         pip=pip,
         error=error,
@@ -697,10 +697,10 @@ def build_python(
         os.mkdir(output_dir)
     if rpm:
         deb = True
-    build_dir = facilify.uniform_path(build_dir)
+    build_dir = stacks.uniform_path(build_dir)
     if distro_depends is None:
         distro_depends = []
-    metadata = facilify.obj(
+    metadata = stacks.obj(
         description=description,
         author_name=author_name,
         author_email=author_email,
@@ -742,7 +742,7 @@ def build_python(
             #elif k == 'url' and url is not None:
             #    metadata['url'] = url
             #else:
-            return facilify.obj(error='No %s could be determined for the package, please specify it manually'%k)
+            return stacks.obj(error='No %s could be determined for the package, please specify it manually'%k)
     if not license_text:
         if os.path.exists(os.path.join(src_dir, 'LICENSE.txt')):
             fp = open(os.path.join(src_dir, 'LICENSE.txt'), 'r')
@@ -861,7 +861,7 @@ def build_python(
             full_version=full_version,
         )
     if no_package:
-        this_result = facilify.obj(dst=None, error=None)
+        this_result = stacks.obj(dst=None, error=None)
     else:
         build_result = dist.build_package(
             build_dir=build_dir,
@@ -881,7 +881,7 @@ def build_python(
             )
         )
         if rpm:
-            facilify.process(['alien', '-r', build_result.dst])
+            stacks.process(['alien', '-r', build_result.dst])
         this_result = build_result
     this_result['calculated_deps'] = calculated_deps
     return this_result
@@ -919,7 +919,7 @@ def build_non_python(
         ".",
         output_dir,
     ]
-    build_result = facilify.process(
+    build_result = stacks.process(
         cmd,
         cwd = src_dir,
         merge = True,
@@ -940,7 +940,7 @@ def build_non_python(
                 ), 
             )
         ]
-        result = facilify.process(
+        result = stacks.process(
             cmd,
             cwd = output_dir,
             merge = True,

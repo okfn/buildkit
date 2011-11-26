@@ -3,7 +3,7 @@ Add packages to a repository
 """
 
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -34,10 +34,10 @@ def run(cmd):
     packages = cmd.args[1:]
     abs_paths = []
     for package in packages:
-        abs_paths.append(facilify.uniform_path(package))
+        abs_paths.append(stacks.uniform_path(package))
     if cmd.opts.find_in:
         cmd_ = 'find "%s" | grep .deb$ | xargs --no-run-if-empty reprepro --gnupghome "%s" includedeb lucid %s' % (
-            facilify.uniform_path(cmd.opts.find_in),
+            stacks.uniform_path(cmd.opts.find_in),
             cmd.opts.key,
             abs_paths and '"' + '" "'.join(abs_paths) + '"' or '',
         )
@@ -49,7 +49,7 @@ def run(cmd):
             'lucid',
         ] + abs_paths)
     cmd.out(cmd_)
-    result = facilify.process(
+    result = stacks.process(
         cmd_,
         cwd = cmd.args[0],
         merge=True,

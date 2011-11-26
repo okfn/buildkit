@@ -4,7 +4,7 @@ Clone a repository
 
 import shutil
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(

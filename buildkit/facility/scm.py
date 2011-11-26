@@ -1,10 +1,10 @@
 import os
 import shutil
 
-from buildkit import facilify
+from buildkit import stacks
 
 def run(scm, cmd, path, error_msg):
-    res = facilify.process(cmd, cwd=path, merge=True)
+    res = stacks.process(cmd, cwd=path, merge=True)
     if res.retcode != 0:
         scm.log.error(str(cmd))
         scm.log.error(res.stdout)

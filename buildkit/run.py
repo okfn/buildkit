@@ -1,10 +1,10 @@
-from buildkit import facilify
+from buildkit import stacks
 import sys
 import os
 
-run_args = facilify.obj(
+run_args = stacks.obj(
     summary = 'Perform common tasks relating to generating and building Python packages',
-    child_command_specs = facilify.find_commands(
+    child_command_specs = stacks.find_commands(
         '%s.command'%__package__, 
         os.path.join(os.path.dirname(__file__), 'command'),
     ),
@@ -33,7 +33,7 @@ run_args = facilify.obj(
 )
 
 if __name__ == '__main__':
-    result = facilify.run(**run_args)
+    result = stacks.run(**run_args)
     sys.exit(result)
 
 

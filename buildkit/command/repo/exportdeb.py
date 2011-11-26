@@ -4,7 +4,7 @@ Copy all the packages from a repository into a directory
 
 import os
 import shutil
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -23,7 +23,7 @@ opt_specs_by_name = dict(
 
 def run(cmd):
     cmd_ = 'find . | grep .deb'
-    result = facilify.process(
+    result = stacks.process(
         cmd_,
         cwd=cmd.args[0],
         shell=True,

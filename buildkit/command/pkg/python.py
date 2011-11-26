@@ -5,7 +5,7 @@ Package a Python library, generating the required DEBIAN/control file automatica
 import os
 import tempfile
 import shutil
-from buildkit import facilify
+from buildkit import stacks
 from buildkit.command import start
 
 arg_specs = [
@@ -153,7 +153,7 @@ def run(cmd):
     if not os.path.exists(src_dir):
         cmd.err('ERROR: No such directory %r', src_dir)
         return 1
-    opts = facilify.str_keys(cmd.opts, ignore=['help', 'license_file'])
+    opts = stacks.str_keys(cmd.opts, ignore=['help', 'license_file'])
     if opts.no_package and opts.rpm:
         cmd.err('ERROR: You can\'t specify both --rpm and --no-package options together')
         return 1
@@ -205,7 +205,7 @@ def build_python(cmd, opts, results):
     del opts['no_rmtmpdir']
     try:
         result = cmd.parent.dist.build_python(
-            facilify.uniform_path(cmd.args[0]),
+            stacks.uniform_path(cmd.args[0]),
             **opts
         )
         results.append(result)
@@ -229,7 +229,7 @@ def build_python(cmd, opts, results):
                 package_name = dep[0]
                 src_dir = os.path.join(opts.build_env_dir, 'src', package_name)
                 result = cmd.parent.dist.build_python(
-                    facilify.uniform_path(src_dir),
+                    stacks.uniform_path(src_dir),
                     **opts
                 )
                 results.append(result)

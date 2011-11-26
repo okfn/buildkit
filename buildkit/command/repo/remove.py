@@ -3,7 +3,7 @@ Remove packages from a repository
 """
 
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -33,7 +33,7 @@ def run(cmd):
     package_names = cmd.args[1:]
     if cmd.opts.all:
         cmd_ = 'reprepro list lucid'
-        result = facilify.process(
+        result = stacks.process(
             cmd_,
             cwd=cmd.args[0],
             shell=True,
@@ -46,7 +46,7 @@ def run(cmd):
                     package_names.append(name)
     cmd_ = 'reprepro --gnupghome "%s" remove lucid %s' % (cmd.opts.key, ' '.join(package_names))
     cmd.out(cmd_)
-    result = facilify.process(
+    result = stacks.process(
         cmd_,
         cwd=cmd.args[0],
         shell=True,

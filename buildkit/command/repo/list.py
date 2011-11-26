@@ -3,7 +3,7 @@ List packages in a repository
 """
 
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(
@@ -16,7 +16,7 @@ opt_specs_by_name = dict(
 
 def run(cmd):
     cmd_ = 'reprepro list lucid'
-    result = facilify.process(
+    result = stacks.process(
         cmd_,
         cwd=cmd.args[0],
         shell=True,

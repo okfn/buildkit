@@ -4,7 +4,7 @@ re-generates that structure when run
 """
 
 import os
-from buildkit import facilify
+from buildkit import stacks
 
 arg_specs = [
     dict(

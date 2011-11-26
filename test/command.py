@@ -3,10 +3,10 @@ import shutil
 import os
 import sys
 
-from buildkit import facilify
+from buildkit import stacks
 from buildkit.run import run_args
 
-class TestGenerate(facilify.TestCase):
+class TestGenerate(stacks.TestCase):
 
     def test_01_generate(self):
         expected = r"""import base64
@@ -70,11 +70,11 @@ if __name__ == "__main__" and len(sys.argv)>1 and not os.path.exists(sys.argv[1]
     render(base_path=sys.argv[1])
     print "done."
 """
-        here = facilify.uniform_path(os.path.dirname(__file__))
+        here = stacks.uniform_path(os.path.dirname(__file__))
         output = []
         def out(*k, **p):
-            output.append(facilify.format_string(*k, **p))
-        result = facilify.run(
+            output.append(stacks.format_string(*k, **p))
+        result = stacks.run(
             argv=['generate', '--binary', 'png', '--ignore', 'ignore', 'generate_src', 'OUTPUT', 'LOG_LEVEL', 'B', 'C'],
             out=out,
             err=out,
@@ -101,10 +101,10 @@ if __name__ == "__main__" and len(sys.argv)>1 and not os.path.exists(sys.argv[1]
             os.path.join(here, 'generate.py'),
             'generate_dst',
         ]
-        facilify.process(cmd)
+        stacks.process(cmd)
         # Now check that the directory structure is identical apart from the ignored file
         cmd = "diff -ru generate_src/ generate_dst/"
-        result = facilify.process(cmd.split(' '))
+        result = stacks.process(cmd.split(' '))
         self.assertEqual(result.stdout, "Only in generate_src/: a1.ignore\n")
 
     def test_02_start(self):
@@ -145,16 +145,16 @@ creating dist
 creating 'dist/generated_package-0.1.2-py2.6.egg' and adding 'build/bdist.linux-x86_64/egg' to it
 removing 'build/bdist.linux-x86_64/egg' (and everything under it)
 """
-        here = facilify.uniform_path(os.path.dirname(__file__))
+        here = stacks.uniform_path(os.path.dirname(__file__))
         if os.path.exists(os.path.join(here, 'generate_package')):
             shutil.rmtree(os.path.join(here, 'generate_package'))
         output = []
         def out(*k, **p):
-            output.append(facilify.format_string(*k, **p))
-        result = facilify.run(
+            output.append(stacks.format_string(*k, **p))
+        result = stacks.run(
             argv=[
                 'start', 
-                '--git-flow',
+                '--git',
                 '--author-name', 'James Gardner',
                 '--author-email', 'james@jimmyg.org',
                 '--version', '0.1.2', 
@@ -170,7 +170,7 @@ removing 'build/bdist.linux-x86_64/egg' (and everything under it)
         self.assertEqual(len(output), 0)
         # Now check that the directory structure is identical apart from the ignored file
         cmd = "python setup.py bdist_egg"
-        result = facilify.process(
+        result = stacks.process(
             cmd.split(' '), 
             cwd=os.path.join(here, 'generate_package')
         )
@@ -183,15 +183,15 @@ removing 'build/bdist.linux-x86_64/egg' (and everything under it)
 
     def test_03_non_python_package(self):
         dirname = 'non_python_package'
-        here = facilify.uniform_path(os.path.dirname(__file__))
+        here = stacks.uniform_path(os.path.dirname(__file__))
         if os.path.exists(os.path.join(here, dirname)):
             shutil.rmtree(os.path.join(here, dirname))
         output = []
         def out(*k, **p):
-            output.append(facilify.format_string(*k, **p))
-        result = facilify.run(
+            output.append(stacks.format_string(*k, **p))
+        result = stacks.run(
             argv=[
-                'dist', 
+                'pkg', 
                 'nonpython', 
                 '--deb',
                 '--rpm',
@@ -212,15 +212,15 @@ removing 'build/bdist.linux-x86_64/egg' (and everything under it)
 
     def test_04_python_package(self):
         dirname = 'python_package'
-        here = facilify.uniform_path(os.path.dirname(__file__))
+        here = stacks.uniform_path(os.path.dirname(__file__))
         if os.path.exists(os.path.join(here, dirname)):
             shutil.rmtree(os.path.join(here, dirname))
         output = []
         def out(*k, **p):
-            output.append(facilify.format_string(*k, **p))
-        result = facilify.run(
+            output.append(stacks.format_string(*k, **p))
+        result = stacks.run(
             argv=[
-                'dist', 
+                'pkg', 
                 'python', 
                 '--rpm',
                 '--author-email', 'author@example.com',

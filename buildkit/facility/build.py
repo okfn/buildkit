@@ -4,7 +4,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from buildkit import facilify
+from buildkit import stacks
 
 #from subprocess import Popen, PIPE, STDOUT
 
@@ -60,8 +60,8 @@ def remove_dist(path):
     Remove the ``build`` and ``dist`` directories from the package whose
     package root is at ``path``.
     """
-    dist_path = facilify.uniform_path(os.path.join(path, 'dist'))
-    build_path = facilify.uniform_path(os.path.join(path, 'build'))
+    dist_path = stacks.uniform_path(os.path.join(path, 'dist'))
+    build_path = stacks.uniform_path(os.path.join(path, 'build'))
     if os.path.exists(dist_path):
         log.debug("Removing %s"%dist_path)
         run(['rm', '-r', dist_path])
@@ -70,14 +70,14 @@ def remove_dist(path):
         run(['rm', '-r', build_path])
 
 def status(path):
-    run(['hg', 'st'], cwd=facilify.uniform_path(path))
+    run(['hg', 'st'], cwd=stacks.uniform_path(path))
 
 def update(path):
     run(['hg', 'update'], cwd=path)
 
 def pull(path):
     """XXX pexpect needed??"""
-    run(['hg', 'pull'], cwd=facilify.uniform_path(path))
+    run(['hg', 'pull'], cwd=stacks.uniform_path(path))
 
 def build_dist(
     path,
@@ -109,13 +109,13 @@ def scan_for_files(base_path, ext=None):
     for dirpath, dirname, filenames in os.walk(base_path):
         for filename in filenames:
             if ext is None or filename.lower().endswith('.'+ext):
-                found.append(facilify.uniform_path(os.path.join(dirpath, filename)))
+                found.append(stacks.uniform_path(os.path.join(dirpath, filename)))
     return found
 
 def copy_files_to(found, dst):
     for path in found:
         if not path == dst:
-            src_filename = facilify.uniform_path(path).split('/')[-1]
+            src_filename = stacks.uniform_path(path).split('/')[-1]
             dst_filename = os.path.join(dst, src_filename)
             log.debug("Copying %s to %s"%(path, dst_filename))
             cp(path, dst_filename)
@@ -261,7 +261,7 @@ def handle_one(
 
 def get_pkg_info(path):
     # Cope with capitalisation variations
-    facilify.process(['python', 'setup.py', 'egg_info'], cwd=path)
+    stacks.process(['python', 'setup.py', 'egg_info'], cwd=path)
     files = os.listdir(path)
     name = None
     for filename in files:
