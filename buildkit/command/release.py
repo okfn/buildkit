@@ -66,6 +66,14 @@ def run(cmd):
         cmd.err("ERROR: Could not find the 'setup.py' file, did you specify the correct directory?")
         return 1
     replace(setup, cmd.args[1], cmd.args[2])
+    # <name>/__init__.py
+    pkg = cmd.build.get_pkg_info(base_dir)
+    name = pkg['Name'][0].lower()
+    init_file = os.path.join(base_dir, name, '__init__.py')
+    if not name or not os.path.exists(init_file):
+        cmd.err('Skipping %r, file not found', init_file)
+    else:
+        replace(init_file, cmd.args[1], cmd.args[2])
     # doc/source/index.rst
     doc_index = os.path.join(base_dir, 'doc', 'source', 'index.rst')
     if not os.path.exists(doc_index):

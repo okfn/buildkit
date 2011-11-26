@@ -177,7 +177,7 @@ def run(cmd):
     if scm_no > 1:
         cmd.err('ERROR: You can only specify one of `--hg\', `--git\' or `--git-flow\'')
         return 1
-    elif not scm_no and cmd.opts.has_key('allow_push'):
+    elif (not scm_no) and cmd.opts.allow_push:
         cmd.err('ERROR: The `--allow-push\' option only works when you also specify one of `--hg\', `--git\' or `--git-flow\'')
         return 1
     #elif not cmd.opts.author_name or not cmd.opts.author_email:

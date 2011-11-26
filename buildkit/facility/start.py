@@ -48,7 +48,7 @@ setup(
     author_email=\'%(author_email)s\',
     url=\'%(url)s\',
     license=\'%(license_name)s\',
-    packages=find_packages(exclude=[\'ez_setup\', \'example\', \'test\']),
+    packages=find_packages(exclude=[\'example\', \'test\']),
     include_package_data=True,
     zip_safe=False,
     install_requires=[
@@ -86,11 +86,10 @@ include test/doc.py
 include test/README.txt
 include example/*.py
 include example/README.txt
-include ez_setup.py
 include CHANGELOG.txt
 include LICENSE.txt
 
-recursive_include *_deb *
+recursive-include distro *
 ''',
     'CHANGELOG.txt': '''Changes
 =======

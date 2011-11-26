@@ -43,13 +43,14 @@ Buildkit Tutorial
    Also note that for the VM funtionality to work, you will need virtualisation CPU extensions. You can check you have the necessary support like this:
 
    ::
+       
        $ sudo apt-get install kvm
        $ kvm-ok
        INFO: Your CPU supports KVM extensions
        INFO: /dev/kvm exists
        KVM acceleration can be used
 
-    You can create a VM without KVM support but you won't be able to run it.
+   You can create a VM without KVM support but you won't be able to run it.
 
 BuildKit is installed as a Debian package so the first thing you need to do is
 to use it to create a debian package from the source.
@@ -105,8 +106,6 @@ You just need to do some other work for a minute or two. Perhaps type on the
 keyboard or copy a file, check email etc. Eventually gpg will collect enough
 entropy and generate you a key which it uses to sign your packages.
 
-QUESTION: Does the buildkit install leave you at a root prompt by mistake?
-
 The default install assumes you will be setting the "host.buildkit" hostname to
 whichever system you will host your repository on and run VMs on. In this case
 this will be localhost so edit ``/etc/hosts`` to add the "host.buildkit" hostname
@@ -137,7 +136,7 @@ Check you have support for KVM:
     KVM acceleration can be used
 
 You can create a VM without KVM support but you won't be able to run it. Here's
-how you create one (the --proxy argument should be the IP address of the system
+how you create one (the ``--proxy`` argument should be the IP address of the system
 running apt-proxy, in this case your local machine):
 
 ::
@@ -162,7 +161,7 @@ a new VM. Let's keep this one as a base VM:
 ::
 
     export IMAGE=`sudo ls /var/lib/buildkit/vm/buildkit10/ | awk '{print $0}' | grep -v "run.sh" | grep -v "disk.raw"`
-    sudo cp -p /var/lib/buildkit/vm/buildkit10/${IMAGE} /var/lib/buildkit/vm/base.qcow2
+    sudo mv /var/lib/buildkit/vm/buildkit10/${IMAGE} /var/lib/buildkit/vm/base.qcow2
 
 You can always just copy the VM manually too, you just have to find out what
 the image name is in the ``buildkit10`` directory.
@@ -171,7 +170,9 @@ Whenever you want a new VM you can then just run:
 
 ::
 
-    sudo -u buildkit qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/new/disk.raw
+    NEWVMNAME=new
+    sudo -u buildkit mkdir /var/lib/buildkit/vm/${NEWVMNAME}
+    sudo -u buildkit qemu-img convert -f qcow2 -O raw /var/lib/buildkit/vm/base.qcow2 /var/lib/buildkit/vm/${NEWVMNAME}/disk.raw
 
 This converts from the small .qcow2 file to a fresh ``disk.raw`` image.
 
@@ -180,6 +181,12 @@ Now let's start it (change eth1 for your network interface):
 ::
 
     sudo buildkit-vm-start eth1 qtap0 512M 1 /var/lib/buildkit/vm/buildkit10/disk.raw
+
+This will open a window for the VM. If you are starting a VM over an SSH connection add the ``-nographic`` option otherwise you'll see an error stating ``Could not initialize SDL - exiting``:
+
+::
+
+    sudo buildkit-vm-start eth1 qtap0 512M 1 /var/lib/buildkit/vm/buildkit10/disk.raw -nographic
 
 Now you can connect from the host to the guest over SSH:
 
