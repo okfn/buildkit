@@ -12,7 +12,6 @@ import time
 import types
 import datetime
 from buildkit import stacks
-from buildkit.facility.build import get_pkg_info
 
 def clone(
     repo, 

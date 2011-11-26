@@ -1,6 +1,18 @@
 Changes
 =======
 
+0.2.2
+-----
+
+2011-11-26
+~~~~~~~~~~
+
+* Replaced facilify with stacks to reflect the rename
+* Release now updates any ``version`` variable in the ``__init__.py`` file
+  of the base package
+* The ``--git`` option to the ``start`` command now doesn't give an error
+* Documenation fixes
+
 0.2.1
 -----
 

@@ -5,6 +5,7 @@ Change the package version numbers in a Python source tree
 import datetime
 import os
 from buildkit import stacks
+from buildkit.helper.build import get_pkg_info
 
 arg_specs = [
     dict(
@@ -67,7 +68,7 @@ def run(cmd):
         return 1
     replace(setup, cmd.args[1], cmd.args[2])
     # <name>/__init__.py
-    pkg = cmd.build.get_pkg_info(base_dir)
+    pkg = get_pkg_info(base_dir)
     name = pkg['Name'][0].lower()
     init_file = os.path.join(base_dir, name, '__init__.py')
     if not name or not os.path.exists(init_file):

@@ -15,7 +15,7 @@ import datetime
 import pkg_resources
 from wsgiref.handlers import _weekdayname, _monthname
 from buildkit import stacks
-from buildkit.facility.build import get_pkg_info
+from buildkit.helper.build import get_pkg_info
 
 log = logging.getLogger(__name__)
 

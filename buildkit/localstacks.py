@@ -1,17 +1,52 @@
 # -*- encoding: utf8 -*-
 
 """\
-We want to build two versions of this script:
+Stacks
+++++++
 
-* This one
-* One with all comments, docstrings, log statements etc removed
+Outstanding Issues
+==================
 
-Ideas:
+* I'm not sure I like the behaviour that empty nested dicts get stripped, I
+  think they should be empty -> things like obj() aren't treated as False
+
+ToDo
+====
+
+* Rename facility functions to avoid conflicts with actions
+  * create        -> facility_create
+  * start         -> facility_add
+  * stop          -> facility_remove
+  * error         -> facility_error
+  * option_schema -> config_schema
+* Change FacilityFunction to be called ``FacilityActions`` and to be the
+  ``.actions`` attribute of a facility [rules for what is an action is
+  everything that is a function, documented in the schema]
+* Add a ``FacilityDependencies`` class to be the ``.deps`` attribute of
+  commands and facilities
+* Only create the ``.local`` variable after ``facility_create()``
+* Upgrade logging to show the ID of the shared stack, the stack and the 
+  facility
+
+Less important
+==============
+
+* Replace all wrap code with my own algorithm
+* Replace getattr code with explict checks
+* Write no_duplicate_names(key, data, errors, context):
+* Write all_aliased_facilites_exist(key, data, errors, context):
+* Rename faclify.run to something else to not confuse with process()
+* Get buildkit to update the version automatically on release
+
+Ideas
+=====
 
 * You can put pdb anywhere, including doctests to debug
 * You can override the entire way command help works with a function that
-  takes the command too
+  takes the command too?
 """
+
+version = '0.1.1'
 
 import os
 try:
@@ -195,7 +230,7 @@ case_sensitive_reserved_words = _mysql_reserved_words + _postgresql_keywords
 try:
     from collections import OrderedDict
 except ImportError:
-    # From http://code.activestate.com/recipes/576693/
+    # From http://code.activestate.com/recipes/576693/ MIT license
     from UserDict import DictMixin
     class OrderedDict(dict, DictMixin):
         def __init__(self, *args, **kwds):
@@ -458,13 +493,10 @@ def _wrap(text, args=None, width=None, pad=None):
 #############################################################################
 #
 # Converters
-# (based on ideas from Navl by David Raznick
-# https://bitbucket.org/kindly/navl/changeset/b52af1370abc and ConversionKit)
 #
 
 import copy
 import inspect
-import logging
 
 try:
     import formencode
@@ -515,7 +547,7 @@ class ordered_obj(obj, OrderedDict):
         #    'You cannot set attributes of this object directly'
         #)
 
-class Unusable(object):
+class _Unusable(object):
     """\
     A class that raises an exception any time you try to access one
     of its instances attributes. The error message it raises is the set when you
@@ -533,7 +565,7 @@ class Unusable(object):
 
     ::
 
-        >>> no_such_key = Unusable('No such key', 'yourmodule.no_such_key')
+        >>> no_such_key = _Unusable('No such key', 'yourmodule.no_such_key')
         >>> no_such_key.key
         Traceback (most recent call last):
           File ...
@@ -557,13 +589,20 @@ class Unusable(object):
         raise Exception(self.__dict__['error_msg'])
 
     def __repr__(self):
-        return '<%s object at 0x%s>'%(self.__dict__['name'], id(self))
+        return '<%s object>'%(self.__dict__['name'],)# id(self))
 
-Missing = ExtraKeys = EmptyList = Unusable
+class Missing(_Unusable):
+    pass
 
-missing = Missing('Missing value', 'stacks.missing')
-empty_list = EmptyList('Empty list', 'stacks.empty_list')
-extra_keys = ExtraKeys('Extra keys', 'stacks.extra_keys')
+class ExtraKeys(_Unusable):
+    pass
+
+class EmptyList(_Unusable):
+    pass
+
+missing = Missing(u'Missing value', u'stacks.missing')
+empty_list = EmptyList(u'Empty list', u'stacks.empty_list')
+extra_keys = ExtraKeys(u'Extra keys', u'stacks.extra_keys')
 
 class StopOnError(Exception):
     '''error to stop validations for a particualar key'''
@@ -639,7 +678,7 @@ def flatten_dict(augmented_data, schema):
     ::
 
         >>> flatten_dict(OrderedDict({"one": 1, "two":[], "three": {}, "four": empty_list}), schema)
-        [(('four',), <stacks.empty_list object at 0x...>), (('three',), {}), (('two',), []), (('one',), 1)]
+        [(('four',), <stacks.empty_list object>), (('three',), {}), (('two',), []), (('one',), 1)]
         >>> flatten_dict({"one": [{"two": {'data': 'dict'}}]}, schema)
         [(('one', 0, 'two'), {'data': 'dict'})]
 
@@ -681,11 +720,9 @@ def augment(dict_data, schema):
         >>> data['one'][0]['two'][0][extra_keys] == {'four': 3}
         True
         >>> print pretty(flatten_dict(data, schema)),
-        [(('one', 0, 'two', 0, <stacks.extra_keys object at 0x...>),
-          {'four': 3}),
-         (('one', 0, 'two', 0, 'three'), 
-         <stacks.missing object at 0x...>),
-         (('one', 1, 'two'), <stacks.empty_list object at 0x...>)]
+        [(('one', 0, 'two', 0, <stacks.extra_keys object>), {'four': 3}),
+         (('one', 0, 'two', 0, 'three'), <stacks.missing object>),
+         (('one', 1, 'two'), <stacks.empty_list object>)]
 
     """
     log.debug('Augmenting %r according to %r', dict_data, schema)
@@ -784,9 +821,9 @@ def unaugment(dict_data, schema):
         >>> augment(data, schema)
         >>> print pretty(data),
         {'one': [{'two': [{'three': 3}]},
-                 {'two': <stacks.empty_list object at 0x...>},
-                 {<stacks.extra_keys object at 0x...>: {'four': 4},
-                  'two': <stacks.missing object at 0x...>}]}
+                 {'two': <stacks.empty_list object>},
+                 {<stacks.extra_keys object>: {'four': 4},
+                  'two': <stacks.missing object>}]}
         >>> result = unaugment(data, schema)
         >>> result == {
         ...     'one': [
@@ -844,17 +881,17 @@ def unaugment(dict_data, schema):
         {'one': [{'two': [{'three': ['random', 'list', 1, {'dict': 'data'}]}]},
                  {'two': [{'three': {'dict': 'data'}}]},
                  {'two': [{'three': 3}]},
-                 {'two': <stacks.empty_list object at 0x...>},
-                 {<stacks.extra_keys object at 0x...>: {'four': 4},
-                  'two': <stacks.missing object at 0x...>}]}
+                 {'two': <stacks.empty_list object>},
+                 {<stacks.extra_keys object>: {'four': 4},
+                  'two': <stacks.missing object>}]}
         >>> flat = flatten_dict(data, schema)
         >>> print pretty(flat),
         [(('one', 0, 'two', 0, 'three'), ['random', 'list', 1, {'dict': 'data'}]),
          (('one', 1, 'two', 0, 'three'), {'dict': 'data'}),
          (('one', 2, 'two', 0, 'three'), 3),
-         (('one', 3, 'two'), <stacks.empty_list object at 0x...>),
-         (('one', 4, <stacks.extra_keys object at 0x...>), {'four': 4}),
-         (('one', 4, 'two'), <stacks.missing object at 0x...>)]
+         (('one', 3, 'two'), <stacks.empty_list object>),
+         (('one', 4, <stacks.extra_keys object>), {'four': 4}),
+         (('one', 4, 'two'), <stacks.missing object>)]
         >>> result = unaugment(data, schema)
         >>> result == {
         ...     'one': [
@@ -1038,6 +1075,13 @@ def validate(data, schema, context=None):
     # Main run including extras
     for key, value in flattened_data:
         if flattened_schema.has_key(key[::2]):
+            if not isinstance(flattened_schema[key[::2]], (tuple, list)):
+                raise TypeError(
+                    'Expected a list or tuple for the %r key, not %r' % (
+                        key[::2][0],
+                        flattened_schema[key[::2]],
+                    )
+                )
             for converter in flattened_schema[key[::2]]:
                 if isinstance(converter, dict):
                     # Apply the schema to the result:
@@ -1063,22 +1107,16 @@ def validate(data, schema, context=None):
                             break
                         else:
                             raise
-                            #import pdb; pdb.set_trace()
-    # XXX Unflattening the data structure removes the position information
-    #     is this a problem, or not?
     result = unflatten(result)
-    # Now remove any remaining missing fields and extra keys
+    # Remove any remaining missing fields and extra keys
     # You can unagument as many times as you like, it shouldn't change
     # the result after the first unagument
     result = unaugment(result, schema)
-    #result = unflatten(dict(result), flattened_schema)
-    # Now remove any empty error fields
+    # Remove any empty error fields
     err = []
     for k, v in errors.iteritems():
         if v != []:
             err.append((k, v))
-    #err = unflatten(err, dict_type=dict_type)
-    #errors = unflatten(dict(err))
     log.debug('Converted data: %r', result)
     log.debug('Converted errors: %r', err)
     return result, err
@@ -1093,7 +1131,6 @@ def convert_one(value, converter, context=None):
         return result[None]
 
 def convert(converter, key, converted_data, errors, context):
-    # XXX Need to convert this to use inspect instead of TypeError exceptions
     if formencode_present:
         if inspect.isclass(converter) and issubclass(converter, formencode.Validator):
             try:
@@ -1109,28 +1146,28 @@ def convert(converter, key, converted_data, errors, context):
             except formencode.Invalid, e:
                 errors[key].append(e.msg)
             return
+    if inspect.isfunction(converter):
+        args, varargs, varkw, defaults = inspect.getargspec(converter)
+        if args == ['key', 'data', 'errors', 'context']:
+            converter(key, converted_data, errors, context)
+            return
+        elif len(args) == 1:
+            try:
+                value = converter(converted_data.get(key))
+            except Exception, e:
+                errors[key] = str(e)
+            else:
+                converted_data[key] = value
+            return
+    # Since we can't use getargspec on all Python objects, we now try brute
+    # force, any Exception will be treated as an error. This allows us to use
+    # things like ``int()``, ``str()`` or classes as validators, but is more
+    # brittle than writing proper functions.
     try:
         value = converter(converted_data.get(key))
         converted_data[key] = value
-        return
-    except TypeError, e:
-        if not converter.__name__ in str(e):
-            raise
-    except Invalid, e:
-        errors[key].append(e.error)
-        return
-    try:
-        converter(key, converted_data, errors, context)
-        return
-    except TypeError, e:
-        if not converter.__name__ in str(e):
-            raise
-    try:
-        value = converter(converted_data.get(key), context)
-        converted_data[key] = value
-        return
-    except Invalid, e:
-        errors[key].append(e.error)
+    except Exception, e:
+        errors[key].append(str(e))
         return
 
 def unflatten(flattened_data):
@@ -1169,7 +1206,7 @@ def unflatten(flattened_data):
         True
 
     """
-    unflattened = {}#dict_type()
+    unflattened = {}
     flattened_data_ = flattened_data
     if not isinstance(flattened_data, dict):
         flattened_data_ = OrderedDict(flattened_data)
@@ -1187,7 +1224,7 @@ def unflatten(flattened_data):
                 current_pos[key] = new_pos
                 current_pos = new_pos
             except IndexError:
-                new_pos = {}#dict_type()
+                new_pos = {}
                 current_pos.append(new_pos)
                 current_pos = new_pos
         log.debug('Setting %r to %r in %r', flattened_key[-1], flattened_data[flattened_key], current_pos)
@@ -1220,8 +1257,9 @@ def format_errors(errors, name='data'):
 # Validators
 #
 
-def identity_converter(key, data, errors, context):
-    return
+
+#def identity_converter(key, data, errors, context):
+#    return
 
 def single_dict(schema, error_msg='Failed to validate against the schema'):
     def validate_dict_converter(key, data, errors, context):
@@ -1233,15 +1271,15 @@ def single_dict(schema, error_msg='Failed to validate against the schema'):
             errors[key] = error_msg
     return validate_dict_converter
 
-def keep_extras(key, data, errors, context):
-    extras = data.pop(key, {})
-    for extras_key, value in extras.iteritems():
-        data[key[:-1] + (extras_key,)] = value
+#def keep_extras(key, data, errors, context):
+#    extras = data.pop(key, {})
+#    for extras_key, value in extras.iteritems():
+#        data[key[:-1] + (extras_key,)] = value
 
 def instance_of(type_):
     def instance_of_converter(key, data, errors, context):
         if not isinstance(data[key], type_):
-            errors[key].append(_stdtrans('Not a %r'%type_))
+            errors[key].append(_stdtrans(u'Not a %r'%type_))
             raise StopOnError()
     return instance_of_converter
 
@@ -1254,7 +1292,7 @@ def split(on=','):
     def split_converter(key, data, errors, context):
         value = data.get(key)
         if value == missing:
-            errors[key].append(_stdtrans('Missing value'))
+            errors[key].append(_stdtrans(u'Missing value'))
             raise StopOnError()
         else:
             data[key] = [x.strip() for x in value.split(on)]
@@ -1263,19 +1301,19 @@ def split(on=','):
 def not_present(key, data, errors, context):
     value = data.get(key)
     if value != missing:
-        errors[key].append(_stdtrans('Unexpected value'))
+        errors[key].append(_stdtrans(u'Unexpected value'))
         raise StopOnError()
 
 def not_missing(key, data, errors, context):
     value = data.get(key)
     if value == missing:
-        errors[key].append(_stdtrans('Missing value'))
+        errors[key].append(_stdtrans(u'Missing value'))
         raise StopOnError()
 
 def not_empty(key, data, errors, context):
     value = data.get(key)
     if not value or value == missing:
-        errors[key].append(_stdtrans('Missing value'))
+        errors[key].append(_stdtrans(u'Missing value'))
         raise StopOnError()
 
 def if_empty_same_as(other_key):
@@ -1291,7 +1329,7 @@ def both_not_empty(other_key):
         other_value = data.get(key[:-1] + (other_key,))
         if (not value or value == missing and
             not other_value or other_value == missing):
-            errors[key].append(_stdtrans('Missing value'))
+            errors[key].append(_stdtrans(u'Missing value'))
             raise StopOnError()
     return callable
 
@@ -1348,16 +1386,20 @@ def ignore_missing(key, data, errors, context):
         data.pop(key, None)
         raise StopOnError()
 
-def convert_int(value, context):
-    try:
-        return int(value)
-    except ValueError:
-        raise Invalid(_stdtrans('Please enter an integer value'))
-
-def add_extras_to(value):
-    def converter(key, data, errors, context):
-        pass # XXX to fix
-    return converter
+def collect_extras(key, data, errors, context):
+    data[key] = data.get(sibling_key(key, extra_keys))
+    
+def collect_keys(keys, strip_missing=True):
+    def collect_keys_converter(key, data, errors, context):
+        value = data.get(key)
+        if value == missing:
+            value = obj()
+        for key_to_collect in keys:
+            value_to_collect = data.get(sibling_key(key, key_to_collect))
+            if not (strip_missing and value_to_collect is missing):
+                value[key_to_collect] = value_to_collect
+        data[key] = value
+    return collect_keys_converter
 
 def common_identifier_for(type='facility'):
     def common_identifier_for_converter(key, data, errors, context):
@@ -1375,7 +1417,6 @@ def common_identifier_for(type='facility'):
 
 import warnings
 import getopt
-import logging
 import sys
 import os
 from logging.config import fileConfig
@@ -1475,12 +1516,12 @@ def summary_from_spec(definition=None, spec=None, name=None):
         try:
             definition = import_and_return(spec)
         except Exception, e:
-            if logging._handlers:
-                log.warning(
-                    'Couldn\'t load command %r for summary text. Error was: %s', 
-                    name,
-                    text_traceback(),
-                )
+            #if logging._handlers:
+            log.warning(
+                'Couldn\'t load command %r for summary text. Error was: %s', 
+                name,
+                text_traceback(),
+            )
             return obj(
                 summary = 'ERROR: Could not be loaded',
 		# XXX It is a bit hacky to use the exception as the definition
@@ -1570,12 +1611,12 @@ def assemble_help(
     return result.strip()
 
 def _logging_run(command):
-    if command.opts.get('logging') and (command.opts.quiet or command.opts.verbose):
+    if command.opts.logging and (command.opts.quiet or command.opts.verbose):
         raise getopt.GetoptError(
             'You cannot specify a LOGGING_FILE and also use the '
             '-q or -v options'
         )
-    if command.opts.get('logging'):
+    if command.opts.logging:
         if not os.path.exists(command.opts.logging):
             raise getopt.GetoptError('No such file %r'%command.opts.logging)
         fileConfig(command.opts.logging)
@@ -2102,7 +2143,13 @@ def handle_command(
         ...     ],
         ...     argv = ['test', '--help'],
         ... )
-        [[], {'help': True}]
+        ERROR: No summary available
+        Usage: run.py test [OPTIONS]
+        <BLANKLINE>
+        Options:
+          -h --help             display this message
+        <BLANKLINE>
+        Type `run.py --help' for parent command options, arguments and other commands.
         >>> result
         0
         >>> result = handle_command(
@@ -2239,6 +2286,9 @@ def handle_command(
         )
         # We can handle help messages automatically:
         if help_opt_name and parsed_argv.opts.get(help_opt_name):
+            # XXX The default logging_run won't be run at this point so logging won't be set up. If there are errors in sub-commands we won't see what they are - maybe we should investigate?
+            logging.basicConfig(level=logging.WARNING)
+            logging.root.setLevel(logging.WARNING)
             out(assemble_help(command, combined_child_command_specs, summary))
             return 0
         if parsed_argv.arg_error:
@@ -2454,7 +2504,6 @@ def import_and_return(spec):
     try:
         result = __import__(module_path)
     except ImportError, e:
-        #import pdb; pdb.set_trace()
         raise
     for part in module_path.split('.')[1:]:
         result = getattr(result, part)
@@ -2574,12 +2623,18 @@ command_specs_schema = ordered_obj({
     'child_command_specs': [],
 })
 
-# XXX No facility definition yet
-# start, stop, error, create, options
 
 facility_specs_schema = obj({
     'name': [not_missing, common_identifier_for('a facility')],
     'spec': [validate_facility_spec],
+    
+     # XXX No facility definition yet
+     # Should exclude:
+     # * all the things here
+     # * start, stop, error, create, option_schema
+     # * local, stack, shared, deps, actions
+     # * config, log, aliases, hooks
+     # * anything starting on_ or _
     'definition': [],
     'alias_specs': alias_spec_schema,
     'hook_specs': obj({
@@ -2606,7 +2661,6 @@ class SharedStack(object):
         self,
         facility_specs=None,
         option=None,
-        config=None,
     ):
         self.facility_specs=[]
         for facility_spec in facility_specs or []:
@@ -2622,14 +2676,14 @@ class SharedStack(object):
         self.config=obj()
         self.shared_facility_state=obj()
 
-    def stack(self, existing_facility_specs=None):
+    def stack(self, bag=None):
         """\
         Return a new stack, sharing the same state as any other stacks returned from this multistack
         """
         self.stack_count += 1
         return Stack(
             self,
-            existing_facility_specs=existing_facility_specs,
+            bag=bag,
         )
 
     def clone(self):
@@ -2639,6 +2693,15 @@ class SharedStack(object):
             #hook_specs=self.hook_specs,
             option=self.option,
         )
+
+    def update_options(self, options):
+        for facility, opts in options.items():
+            if facility in self.config:
+                raise Exception('Cannot update options for %r facility, it has already been configured')
+            if not self.option.has_key(facility):
+                self.option[facility] = dict()
+            for name, value in opts.items():
+                self.option[facility][name] = value
 
 def uncollect_by(var, data):
     result = []
@@ -2668,7 +2731,20 @@ def collect_by(var='name', data=None):
 import inspect
 class Facility(object):
 
-    def __init__(self, stack, name, alias_specs, config, log=None, warn=None):
+    def __init__(
+        self, 
+        stack, 
+        name, 
+        alias_specs, 
+        config, 
+        log=None, 
+        warn=None, 
+        # Copied here, for convenience only, not used
+        option_schema=None,
+        spec=None,
+        definition=None,
+        hook_specs=None,
+    ):
         self.stack = stack
         self.config = config
         self.name = name
@@ -2686,9 +2762,13 @@ class Facility(object):
         else:
             self.warn = warn
         self.local = obj()
-        # We need to set this a slightly comlicated way so that it doesn't
+        # These don't do anything, but we keep them here so that if anyone does dir(facility) in the Python interactive prompt they can see the values we are using
+        # We need to set this a slightly complicated way so that it doesn't
         # cause problems with the __getattr__() code below.
-        self.__dict__['definition'] = stack.shared.facility_specs_by_name[self.name].definition
+        self.__dict__['definition'] = definition or stack.shared.facility_specs_by_name[self.name].definition
+        self.option_schema = option_schema
+        self.spec = spec
+        self.hook_specs = hook_specs
 
     def hooks(self, hook_name):
         return self.stack.hooks(self.name, hook_name)
@@ -2722,8 +2802,9 @@ class Facility(object):
             raise KeyError('No such facility %r'%name)
 
     def __repr__(self):
-        return '<class Facility name=%r stack=%r id=%r>'%(
+        return '<class Facility name=%r shared=%r stack=%r id=%r>'%(
             self.__dict__['name'],
+            id(self.__dict__['stack'].shared),
             id(self.__dict__['stack']),
             id(self),
         )
@@ -2754,13 +2835,11 @@ class FacilityFunction(object):
 
 class Stack(object):
     # Keeps self.started.facilities = track of the order of pipes
-    def __init__(self, shared, existing_facility_specs=None):
+    def __init__(self, shared, bag=None):
         self.shared = shared
         self.started = obj()
-        if existing_facility_specs:
-            self.started['facilities'] = OrderedDict(existing_facility_specs[:])
-        else:
-            self.started['facilities'] = OrderedDict()
+        self.bag = bag
+        self.started['facilities'] = OrderedDict(self.bag or {})
         self.finished = False
         self.started['hooks'] = obj()
 
@@ -2905,25 +2984,26 @@ class Stack(object):
         for name in self.started.facilities:
             try:
                 facility = self.started.facilities[name]
-                if not error:
-                    try:
-                        if hasattr(facility.definition, 'stop'):
-                            facility.definition.stop(facility)
-                        del self.started.facilities[name]
-                    except Exception, e:
-                        log.error(
-                            "Error occurred calling the __stop__() handler "
-                            "of the %r facility. About to call the "
-                            "__error__() handler instead. The error was: %s",
-                            name,
-                            text_traceback(),
-                        )
+                if hasattr(facility, 'definition'):
+                    if not error:
+                        try:
+                            if hasattr(facility.definition, 'stop'):
+                                facility.definition.stop(facility)
+                            del self.started.facilities[name]
+                        except Exception, e:
+                            log.error(
+                                "Error occurred calling the __stop__() handler "
+                                "of the %r facility. About to call the "
+                                "__error__() handler instead. The error was: %s",
+                                name,
+                                text_traceback(),
+                            )
+                            if hasattr(facility.definition, 'error'):
+                                facility.definition.error(facility)
+                            error = True
+                    else:
                         if hasattr(facility.definition, 'error'):
                             facility.definition.error(facility)
-                        error = True
-                else:
-                    if hasattr(facility.definition, 'error'):
-                        facility.definition.error(facility)
             except Exception, e:
                 tb = text_traceback()
                 if error:
@@ -2954,13 +3034,14 @@ class Stack(object):
         if not facility_spec.has_key('definition'):
             # We've not used this facility before, import it
             facility_spec['definition'] = import_and_return(facility_spec.spec)
-            # We now have the object and the config we can set up the shared state
+            # We now have the object we can set up the shared state
         # Now ensure any config we need exists
         if not self.shared.config.has_key(name):
             if self.shared.option.has_key(name):
                 option = self.shared.option[name]
             else:
                 option = {}
+            # Let's set up the config
             schema = obj(getattr(facility_spec.definition, 'option_schema', {}))
             result, error = validate(option, schema)
             if error:
@@ -2989,6 +3070,9 @@ class Stack(object):
             name=name,
             config=self.shared.config[name],
             alias_specs=facility_spec.get('alias_specs', {}),
+            # Not strictly needed but we keep them for help() purposes
+            option_schema=schema,
+            spec=facility_spec
         )
         self.started.facilities[name] = facility
         created = False
@@ -3002,12 +3086,25 @@ class Stack(object):
             facility.definition.start(facility)
         self.started.facilities[name] = facility
 
-def flow(shared, existing_facility_specs=[], ensure=[], run=None):
-    for name in ensure:
-        if ensure.count(name)>1:
-            raise Exception('The facility %r is specified more than once in the ensure argument'%name)
+#config_facility_shared_state = obj()
+#def config_facility_definition_prepare(config, name, filename):
+#    if name in config.stack.started:
+#        raise Exception('The %r facility has already been started, it is too late to configure it')
+#    filename = uniform_path(filename)
+#    options = parse_config(filename)
+#
+#    config.stack.options.update(name, values)
+#
+#config_facility_definition = obj(
+#    prepare=config_facility_definition_prepare
+#)
+
+def flow(shared, bag=None, run=None):
+    #for name in ensure:
+    #    if ensure.count(name)>1:
+    #        raise Exception('The facility %r is specified more than once in the ensure argument'%name)
     #if bag is None:
-    #    stack = Stack(options={}, config={})
+    #    stack = Stack(options={})
     #else:
     #    for name in reserved:
     #        if stack.has_key(name):
@@ -3015,7 +3112,9 @@ def flow(shared, existing_facility_specs=[], ensure=[], run=None):
     #    for name in reserved:
     #        if hasattr(bag, name):
     #            raise Exception('Stacks are not allowed to have an attribute named %r'%name)
-    stack = shared.stack()
+    if not shared.__class__.__name__ == 'SharedStack':
+        raise TypeError('Expected a shared stack object for the \'shared\' argument not %r'%shared)
+    stack = shared.stack(bag=bag)
     #for name in ensure:
     #    stack.start(name)
     try:
@@ -3027,6 +3126,33 @@ def flow(shared, existing_facility_specs=[], ensure=[], run=None):
         raise
     stack.finish(False)
     return result
+
+def find_facilities(package, path):
+    facility_specs = []
+    if not os.path.isdir(path):
+        path = os.path.dirname(path)
+    if os.path.exists(path):
+        for filename in os.listdir(path):
+            if not os.path.isdir(os.path.join(path, filename)):
+                if filename.endswith('.py') and \
+                   not filename == '__init__.py':
+                    # Treat this is a facility
+                    module = filename[:-3]
+                    facility_specs.append(
+                        {
+                            'name': module, 
+                            'spec': '%s.%s'%(package, module),
+                        }
+                    )
+            elif os.path.exists(os.path.join(path, filename, '__init__.py')):
+                module = filename
+                facility_specs.append(
+                    {
+                        'name': module, 
+                        'spec': '%s.%s'%(package, module),
+                    }
+                )
+    return facility_specs
 
 def find_commands(package, path):
     child_command_specs = []
@@ -3435,6 +3561,7 @@ def str_keys(dictionary, ignore=None):
             new_dict[str(k)] = v
     return obj(new_dict)
 
+# Python license?
 def getcallargs(func, *positional, **named):
     """Get the mapping of arguments to values when calling func(*positional, **named).
 
@@ -3536,6 +3663,9 @@ def getcallargs(func, *positional, **named):
 
 #import functools
 def conform(schema):
+    """\
+    This is a decorator that is used to validate function arguments against a schema
+    """
     def conform_decorator(func):
         #@functools.wraps(func)
         def conform_function_wrapper(facility, *args, **kwargs):
@@ -3625,13 +3755,28 @@ def process(
     )
     return result
 
-from unicodedata import decomposition
+
+import unicodedata
 import string
 def char_string(text, replace='-', allowed='-.'):
+    """\
+    Convert a string to remove everything but ASCII letters and numbers and
+    characters in ``allowed``. Useful for making slugs. Accented characters are
+    turned to their best-guess ASCII equivalent.
+
+    For example:
+
+    >>> mystring = u'\xe0i\xe9\xe8\xea\xe0<>\xf9\xe7\xc7' # u"àiéèêà<>ùçÇ"
+    >>> char_string(mystring)
+    u'aieeea-ucC'
+    >>> char_string(u'Name: James')
+    u'Name-James'
+
+    """
     result = u''
-    for c in text:
-        d = decomposition(c)
-        if d:
+    for c in unicode(unicodedata.normalize('NFKD', text).encode('ascii','ignore')):
+        d = unicodedata.decomposition(c)
+        if d and not d.split(' ')[0] == '<noBreak>':
             result += unichr(int(d.split()[0], 16))
         elif c in allowed+string.lowercase+string.uppercase+allowed:
             result += c
@@ -3639,4 +3784,171 @@ def char_string(text, replace='-', allowed='-.'):
             result += '-'
     while '--' in result:
         result = result.replace('--', '-')
+    return result
+
+#############################################################################
+#
+# ConfigConvert
+#
+
+def parse_config(filename, encoding='utf8', by_facility=True):
+    r"""\
+    Parse a config file with a strict format.
+
+    The config file is made of options and values which are each defined on a
+    single line terminated by a ``\n`` character and separtated by only the 
+    three characters *space equals space*. For example:
+
+    ::
+
+        option = value
+
+    The parsed config file results in a dictionary with the options as ASCII
+    strings for the keys and the values as unicode strings for the values. The
+    options must start with the letters a-z, A-Z or _ and should contain only
+    letters, numbers or the ``_`` character. Thus the option values have the
+    same naming rules as Python variables.
+
+    If you don't leave a space each side of the ``=`` character it is
+    considered a syntax error. Any extra space characters after the space
+    after the equals sign are treated as part of the value. For example this:
+
+    ::
+
+        option =  value
+   
+    would result in the option ``'option'`` taking the value ``u' value'``. 
+    Any extra spaces after the option name are ignored though.
+
+    The file must use UNIX style line endings (ie each line ends in ``\n``)
+    and must be encoded as UTF-8. Values can therefore take any Unicode
+    character as long as the file is encoded correctly.
+
+    You can also specify multiline values. You do so by specifying the first
+    line of the multiline value on the same line as the option starting
+    immediately after the space after the equals sign (once again any extra
+    spaces will be treated as part of the value). All subsequent lines have to
+    be indented 4 spaces. Any characters after those 4 spaces are treated as
+    part of the line. In fact the first line doesn't have to contain any text
+    if you are using a multiline value, in which case the value will start
+    with a ``\n`` character. Here are two examples:
+
+    ::
+
+        option1 = This
+            is
+                a
+            multiline string
+        option2 = 
+            and
+            so is this
+
+    Note: The implementation doesn't enforce all the option naming conventions
+    yet
+    """
+    if not os.path.exists(filename):
+        raise Exception('No such file %r'%filename)
+    if os.path.isdir(filename):
+        raise Exception('%r is a directory, not a file'%filename)
+    data = None
+    try:
+        # Open in binary mode to avoid Python doing clever things with line
+        # endings
+        fp = open(filename, 'rb')
+        data = fp.read().decode('utf-8')
+        fp.close()
+        fp = None
+    finally:
+        if 'fp' in locals() and fp:
+            fp.close()
+        if data is None:
+            raise Exception(
+                'Could not read the data from %r, do you have the correct '
+                'permissions and is it encoded as UTF8?'%filename
+            )
+    pairs = parse_config_string(data, filename, encoding)
+    if by_facility:
+        return split_options(pairs)
+    return pairs
+
+def parse_config_string(data, filename=None, encoding='utf8'):
+    conf = {}
+    cur_option = None
+    cur_value = None
+    for i, line in enumerate(unicode(data).split('\n')):
+         if line.startswith('#'):
+             # It is a comment
+             continue
+         elif line.startswith('    '):
+             if i == 0:
+                 raise SyntaxError(
+                     'Line %s cannot start with four spaces'%(i+1)
+                 )
+             # It is either a mistake, blank line or part of a multiline
+             # value
+             elif cur_option is None:
+                 if not line.strip():
+                     # Probably just bad indentation, ignore
+                     continue
+                 raise SyntaxError(
+                     'Line %s is indented but no option has been specified'%(i+1)
+                 )
+             else:
+                 # It is part of a multiline string
+                 cur_value.append(line[4:])
+         elif not line.strip():
+             # Assume it is the end of a multiline string:
+             if cur_option is not None:
+                 conf[str(cur_option)] = '\n'.join(cur_value)
+                 cur_option = None
+                 cur_value = None
+             continue
+         elif (ord(line[0]) >= 65 and ord(line[0])<=90) or \
+            (ord(line[0]) >= 97 and ord(line[0])<=122) or \
+            ord(line[0]) == 95:
+             # It is the start of an option
+             parts = line.split(' = ')
+             if len(parts) == 1:
+                 error = "Expected the characters ' = ' on line %s"
+                 if '=' in line:
+                     error += ", not just an '=' on its own"
+                 raise SyntaxError(error%(i+1))
+             elif len(parts) > 2:
+                 value = ' = '.join(parts[1:])
+             else:
+                 value = parts[1]
+             # Extra whitespace after the option is ignored 
+             option = parts[0].strip()
+             if conf.has_key(option):
+                 raise SyntaxError(
+                     'The option %s found on line %s was already '
+                     'specified earlier in the file'%(option, i+1)
+                 )
+             # Add the previous config option
+             if cur_option is not None:
+                 conf[str(cur_option)] = '\n'.join(cur_value)
+             cur_option = option
+             cur_value = [value]
+         else:
+             raise SyntaxError(
+                 'Unexpected character at the start of line %s'%(i+1)
+             ) 
+    # Add the last config option
+    if cur_option is not None:
+        conf[cur_option] = '\n'.join(cur_value)
+    #if not conf.has_key('app.filename'):
+    #    conf['app.filename'] = filename
+    return conf
+
+def split_options(options):
+    result = {}
+    for k, v in options.items():
+        parts = k.split('.')
+        if not len(parts) > 1:
+            raise Exception('Expected the option name %r to contain a \'.\' character')
+        facility = parts[0]
+        option = '.'.join(parts[1:])
+        if not result.has_key(facility):
+            result[facility] = dict()
+        result[facility][option] = v
     return result
