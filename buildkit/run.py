@@ -9,7 +9,7 @@ run_args = stacks.obj(
         os.path.join(os.path.dirname(__file__), 'command'),
     ),
     facility_specs = stacks.find_facilities(
-        '%s.command'%__package__, 
+        '%s.facility'%__package__, 
         os.path.join(os.path.dirname(__file__), 'facility'),
     ),
 )
