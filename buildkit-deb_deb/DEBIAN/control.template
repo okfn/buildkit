@@ -1,0 +1,9 @@
+Section: main/python
+Priority: extra
+Maintainer: James Gardner <james@pythonweb.org>
+Homepage: http://jimmyg.org/
+Package: buildkit-deb
+Version: 0.2.0+01+lucid
+Architecture: all
+Depends: buildkit, gawk, sed, findutils, rsync, wget, dh-make, devscripts, build-essential, fakeroot, alien, cdbs, python-pip, python-virtualenv, subversion, mercurial, git-core 
+Description: Build .deb files from Python packages

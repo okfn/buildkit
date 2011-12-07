@@ -31,17 +31,18 @@ then
 fi
 echo "Host IP is $IP"
 
-APTPROXY=`ps aux | grep /usr/sbin/apt-proxy | grep -v grep`
-if [ ! "$APTPROXY" ]
+APTCACHERNG=`ps aux | grep /usr/sbin/apt-cacher | grep -v grep`
+if [ ! "$APTCACHERNG" ]
 then
-    echo "Starting apt-proxy ..."
-    /etc/init.d/apt-proxy start
+    echo "Starting apt-cacher-ng ..."
+    /etc/init.d/apt-cacher-ng start
     echo "done."
 fi
 
-echo "Starting apache to host the repos ..."
-/etc/init.d/apache2 start
-echo "done."
+#echo "Starting apache to host the repos ..."
+#/etc/init.d/apache2 start
+#echo "done."
+
 echo "Creating bridge..."
 iptables -t nat -A POSTROUTING -o ${NETWORK_DEVICE} -j MASQUERADE
 brctl addbr br0
@@ -67,9 +68,20 @@ echo "Mounting VM to update the DNS settings ..."
 
 mount -t ext4 -o loop,offset=512 $IMAGE /var/lib/buildkit/vmtmp
 cp /etc/resolv.conf /var/lib/buildkit/vmtmp/etc/resolv.conf
-cat << EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
-// Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };" 
-EOF
+
+APTCACHE=`dpkg -l | grep "ii  buildkit-apt-cache"`
+if [ "$APTCACHE" ] 
+then
+    echo "Enabling apt caching in the VM ..."
+    cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
+	Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };
+	EOF
+else
+    echo "Disabling apt caching in the VM ..."
+    cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
+	// Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };
+	EOF
+fi
 echo $IP > /var/lib/buildkit/vmtmp/etc/buildkit_host_ip
 COMMAND_OUTPUT=`cat /var/lib/buildkit/vmtmp/etc/hosts | grep "host.buildkit"`
 if ! [[ "$COMMAND_OUTPUT" =~ "host.buildkit" ]] ; then

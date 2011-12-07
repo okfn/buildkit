@@ -169,3 +169,15 @@ buildkit_ensure_apache() {
     sudo /etc/init.d/apache2 restart
 }
 
+buildkit_ensure_apt_cacher() {
+    echo "Writing to /etc/apt-cacher-ng/ubuntu_security ..."
+    cat <<- EOF > /etc/apt-cacher-ng/ubuntu_security
+	http://security.ubuntu.com/ubuntu
+	EOF
+    echo "done."
+    echo "Updating /etc/apt-cacher-ng/acng.conf ..."
+    sed -e "s,Port:3142,Port:9999," \
+        -e "s,; file:backends_debvol, ;  file:backends_debvol\nRemap-ubusec: file:ubuntu_security /ubuntu-security ; http://security.ubuntu.com/ubuntu," \
+                -i /etc/apt-cacher-ng/acng.conf
+    echo "done."
+}

@@ -176,6 +176,17 @@ Whenever you want a new VM you can then just run:
 
 This converts from the small .qcow2 file to a fresh ``disk.raw`` image.
 
+At this point you can also edit the image's network settings (don't use the
+``vmtmp`` directory here unless you are sure you won't start any VMs until
+you've unmounted it again):
+
+::
+
+    sudo mount -t ext4 -o loop,offset=512 /var/lib/buildkit/vm/${NEWVMNAME}/disk.raw /var/lib/buildkit/vmtmp
+    # Make your changes...
+    # Edit /etc/hostname and ensure the new hostname appears in /etc/hosts
+    sudo umount /var/lib/buildkit/vmtmp
+
 Now let's start it (change eth1 for your network interface):
 
 ::
@@ -507,6 +518,8 @@ Other ideas:
   (it currently gives bad header lines which seems to be a known, yet
   unresolved issue) so there is no caching of install packages used in the
   VMs.
+* Document how to install the different commands
+* Make the VMs able to access the host even without an external network
 
 More buildkit help
 ==================

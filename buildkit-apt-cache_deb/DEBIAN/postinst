@@ -4,9 +4,6 @@
 NAME="BuildKit-Automatic-Packaging"
 BASEDIR="/var/lib/buildkit"
 
-buildkit_ensure_user_and_group
-buildkit_ensure_buildkit_directories "${BASEDIR}"
-buildkit_ensure_permissions
-
-
+buildkit_ensure_hosts
+buildkit_ensure_apt_cacher
 

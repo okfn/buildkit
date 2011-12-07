@@ -2,8 +2,8 @@ Section: main/python
 Priority: extra
 Maintainer: James Gardner <james@pythonweb.org>
 Homepage: http://jimmyg.org/
-Package: buildkit
+Package: buildkit-vm
 Version: 0.2.0+01+lucid
 Architecture: all
-Depends: python-buildkit 
+Depends: buildkit, ubuntu-vm-builder, python-vm-builder, kvm, apt-cacher-ng, kvm-pxe, uml-utilities
 Description: Cloud infrastructure and .deb file management software

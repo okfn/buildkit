@@ -763,7 +763,8 @@ def build_python(
     if result.retcode:
         raise Exception('Failed to prepare the build dir')
     debian_path = os.path.join(src_dir, 'distro', 'lucid', 'debian')
-    if os.path.exists(debian_path):
+    # deps aren't ready at this point - need a rethink!
+    if 0:#os.path.exists(debian_path):
         result = dist.copy_debian_dir(
             debian_path=debian_path,
             full_version=full_version, 

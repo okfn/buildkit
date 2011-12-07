@@ -4,6 +4,12 @@ Changes
 0.2.2
 -----
 
+2011-12-07
+~~~~~~~~~~
+
+* Splitting the buildkit functionality up into different deb packages
+* Swapping apt-proxy for apt-cacher-ng
+
 2011-11-26
 ~~~~~~~~~~
 
