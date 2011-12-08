@@ -4,7 +4,8 @@
 NAME="BuildKit-Automatic-Packaging"
 BASEDIR="/var/lib/buildkit"
 
-buildkit_ensure_public_key "$NAME" "buildkit@example.com" "BuildKitkey" "buildkit" "${BASEDIR}/key" "${BASEDIR}/repo"
+buildkit_ensure_buildkit_directories /var/lib/buildkit/
+buildkit_ensure_permissions 
 buildkit_ensure_base_repo "${BASEDIR}/repo" "$NAME"
 buildkit_ensure_apache "${BASEDIR}/repo"
 

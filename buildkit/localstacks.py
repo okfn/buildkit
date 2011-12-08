@@ -13,12 +13,20 @@ Outstanding Issues
 ToDo
 ====
 
+* Get tests passing
 * Rename facility functions to avoid conflicts with actions
   * create        -> facility_create
-  * start         -> facility_add
-  * stop          -> facility_remove
+  * start         -> facility_start
+  * stop          -> facility_stop
   * error         -> facility_error
   * option_schema -> config_schema
+* Move start() out of the Facility
+* Allow the use of init() to set variables dynamically
+* Add a ``facility_getattr()`` method which determines how facility 
+  attributes are routed. This would allow our http object to route things
+  like ``.response``directly whilst also providing a place for conflict 
+  warning messages to go
+* Make the facility and command discovery code return by name
 * Change FacilityFunction to be called ``FacilityActions`` and to be the
   ``.actions`` attribute of a facility [rules for what is an action is
   everything that is a function, documented in the schema]
@@ -27,6 +35,65 @@ ToDo
 * Only create the ``.local`` variable after ``facility_create()``
 * Upgrade logging to show the ID of the shared stack, the stack and the 
   facility
+* Deprecate the use of bag and instead allow facilities to have an init()
+* Hooks currently need to be loaded in order to work. Need to allow hooks
+  to be added dynamically in create() and also to maybe have named hooks
+  name -> type (eg load_driver)
+  name -> New attribute which allows loading hook by name eg (postgresql)
+
+
+So, for web stuff 
+* ``tornado_handler()`` will call ``stack.http.init(environ, status, headers, exc_info)``
+* That code will route however it likes, most likley with an algorithm like:
+  * Start key facilities like error_report, etc
+  * Make adjustments for X_HTTP_FORWARDED_FOR etc
+  * Load the ``apps`` facility to provide routing to different URLs
+  * Use a ``resolve`` facility to resolve a location from the ones provided by the ``apps`` extension
+  * Use a ``static`` facility to try to serve a static file from the ``resolve`` 
+  * Look for facilities named ``web_*`` and route the first part of the path
+    to there or to ``web_index`` if there is none. These should have a ``dispatch``
+    action and OR use hooks to dispatch via ``apps``.
+  * Have the concept of dispatch to "controllers" which are just modules with
+    
+
+       pipe('errorreport', 'errorreport:ErrorReportPipe'),
+       pipe('apps', 'appdispatch:URLDispatchPipe'),
+       pipe('template', 'dreamweavertemplate.service:DwtPipe'),
+       pipe('errordocument', 'errordocument:ErrorDocumentPipe'),
+       pipe('ticket', 'authtkt.service:AuthTktPipe'),
+       pipe('user',  'usermanager.driver.postgresql:PostgreSQLUserManager'),
+       pipe('database', 'databasepipe.service.connection:DatabasePipe'),
+       pipe('jinja2', 'jinja2pipe:Jinja2Pipe'),
+       pipe('input', 'httpkit.service.input:InputPipe'),
+       pipe('query', 'httpkit.service.query:QueryPipe'),
+       pipe('flash', 'flashmessage:FlashMessagePipe'),
+       pipe('api', 'thirdbuddy.api:RootAPIPipe'),
+       # Apps
+       pipe('auth', 'authtkt.app:AuthApp'),
+       pipe('root', 'thirdbuddy.root:IndexPipe'),
+       # Static files
+       pipe('resolve', 'staticdispatch:ResolvePipe'),
+       pipe('static',  'staticdispatch:StaticPipe'),
+       # Manta
+       pipe('manta_store',   'manta.store:MantaStorePipe'    ),
+       pipe('manta_rewrite', 'manta.rewrite:MantaRewritePipe', aliases=dict(store='manta_store', page='manta_page')),
+       pipe('manta_block',   'manta.block:MantaBlockPipe'    ),
+       pipe('manta_page',    'manta.page:MantaPagePipe', aliases=dict(store='manta_store')),
+       pipe('manta_create',  'manta.create:MantaCreatePipe'  ),
+       pipe('manta_edit',  'manta.edit:MantaEditPipe'  ),
+       # 404
+       pipe('not_found', 'httpkit.service.not_found:NotFoundPipe'),
+
+I'd imagine that apps are their own plugin type and that each one has hooks to each of the things it uses:
+* templates
+* routing and dispatch
+
+Options are:
+1. Have an app class which all the various facilities are aware of and deal with via an apps facility
+2. Have an app class which wraps the functionality of the facilities it uses to make it availble to its own controllers
+3. Register hooks for every app directly with every facility it uses (possibly with bulk register functionality)
+4. Have a facility for each app which provides functions the rest of the app will use.
+
 
 Less important
 ==============
@@ -310,7 +377,8 @@ except ImportError:
         def __repr__(self):
             if not self:
                 return '%s()' % (self.__class__.__name__,)
-            return '%s(%r)' % (self.__class__.__name__, self.iteritems())
+            # return '%s(%r)' % (self.__class__.__name__, self.iteritems())
+            return pretty(self)
 
         def copy(self):
             return self.__class__(self)
@@ -334,6 +402,9 @@ except ImportError:
 #
 # Advanced Wrap
 #
+
+
+# XXX Begin Deprecated
 
 """\
 http://code.activestate.com/recipes/267662/
@@ -436,6 +507,134 @@ def two_cols(rows):
         separateRows=False,
         wrapfunc=wrapper
     )
+
+# End Deprecated
+
+def table(columns, values, width=None, display=None, mode=None):
+    """\
+    ``mode`` can be 'sql' or None
+    ``display`` can be 'terminal' or None
+    """
+
+    # Verify Data
+    length = len(columns)
+    for i in range(len(values)):
+        if length <> len(values[i]):
+            raise Exception("There are %s columns but row %s of values contains %s value(s)."%(length, i, len(values[i])))
+    
+    # Format the data if asked
+    if mode == 'sql':
+        rows=[]
+        for value in values:
+            row=[]
+            for v in value:
+                if type(v) == type(''):
+                    row.append(repr(v))
+                elif v == None:
+                    row.append('NULL')
+                else:
+                    row.append(str(v))
+            rows.append(row)
+        values = rows
+        
+    # Put the data in a more managable form
+    vals = []
+    for i in range(len(columns)):
+        vals.append([columns[i],[]])
+    for row in values:
+        for i in range(len(columns)):
+            vals[i][1].append(row[i])
+    values = vals
+    
+    # Get the column widths
+    if (width <> None) and (width < 0 or type(width) <> type(1)):
+        raise Exception('The output width must be an integer greater than 0.')
+    else:
+        d = {}
+        for p in values:
+            d[p[0]] = {'names':p[1],'widths':[], 'max':0}
+        for column, v in d.items():
+            d[column]['max'] = len(repr(str(column)))-2
+            for field in v['names']:
+                d[column]['widths'].append(len(repr(str(field)))-2)
+                if len(repr(str(field)))-2 > d[column]['max']:
+                    d[column]['max'] = len(repr(str(field)))-2
+
+        # Create the output
+        output = ''
+        length = len(d)
+        c = 0
+        for column in columns:
+            c += 1
+            end = ''; first = ''
+            if c == 1:
+                first = '+'
+            if c == length:
+                end = '\n'
+            output += first+'-'+('-'*d[column]['max'])+'-+'+end
+        c = 0
+        for column in columns:
+            c += 1
+            end = ''; first = ''
+            if c == 1:
+                first = '|'
+            if c == length:
+                end = '\n'
+            output += first+' '+repr(str(column))[1:-1]+(' '*(d[column]['max'] - len(repr(str(column)))+2))+' |'+end
+        c = 0
+        for column in columns:
+            c += 1
+            end = ''; first = ''
+            if c == 1:
+                first = '+'
+            if c == length:
+                end = '\n'
+            output += first+'-'+('-'*d[column]['max'])+'-+'+end
+        for value in range(len(d[column]['names'])):
+            c = 0
+            for column in columns:
+                c += 1
+                end = ''; first = ''
+                if c == 1:
+                    first = '|'
+                if c == length:
+                    end = '\n'
+                output += first+' '+repr(str(d[column]['names'][value]))[1:-1]+(' '*(d[column]['max'] - len(repr(str(d[column]['names'][value])))+2))+' |'+end
+        c = 0
+        for column in columns:
+            c += 1
+            end = ''; first = ''
+            if c == 1:
+                first = '+'
+            if c == length:
+                end = '\n'
+            output += first+'-'+('-'*d[column]['max'])+'-+'+end
+        if width:
+            lines = output.split('\n')
+            j = len(lines[0]) # Maximum number of characters in lines
+            k = int((j / float(width))+1) # Number of rows
+            rows = []
+            for j in range(k):
+                rows.append([])
+            for line in lines:
+                for j in range(k):
+                    if j == (k-1):
+                        rows[j].append(line[(j*width):((j+1)*width)]+'\n')
+                    else:
+                        end = '\n'
+                        if display == 'terminal':
+                            end = ''
+                        rows[j].append(line[(j*width):((j+1)*width)]+end)
+            o = ''
+            for row in rows:
+                o += ''.join(row)
+            while o and o[-1] == '\n':
+                o = o[:-1]
+            return o
+        else:
+            while output and output[-1] == '\n':
+                output = output[:-1]
+            return output
 
 def __wrap(text, width=None, pad=None):
     """\
@@ -586,6 +785,8 @@ class _Unusable(object):
         self.name = name
 
     def __getattr__(self, name):
+        if name == '__deepcopy__':
+            return getattr(object, name)
         raise Exception(self.__dict__['error_msg'])
 
     def __repr__(self):
@@ -1061,13 +1262,19 @@ def validate(data, schema, context=None):
     # Augment the data with a value of ``missing`` for any keys in the
     # schema which aren't present and move any extra keys to ``extra_keys``
     # Note: data is augmented *in place* so no value is returned
+    schema_type = type(schema)
     augment(data, schema)
+    assert type(schema) == schema_type
     log.debug('Augmented data: %r', data)
     # Flatten the data dictionary
+    schema_type = type(schema)
     flattened_data = flatten_dict(data, schema)
+    assert type(schema) == schema_type
     log.debug('Flattened data: %r', flattened_data)
     # Flatten the schema
+    schema_type = type(schema)
     flattened_schema = flatten_schema(schema)
+    assert type(schema) == schema_type
     log.debug('Flattened schema: %r', flattened_schema)
     # Create an error dictionary mirroring the schema
     errors = OrderedDict([(key, []) for key, value in flattened_data])
@@ -1097,6 +1304,12 @@ def validate(data, schema, context=None):
                         errors[k] = v
                         counter += 1
                 else:
+                    if context is None:
+                        context = obj()
+                    context['validate'] = obj(data=data, schema=schema)
+                    for k, v in data.items():
+                        if v == extra_keys:
+                            raise Exception('Found extra_keys as the value of %r'%k)
                     try:
                         convert(converter, key, result, errors, context)
                     except StopOnError, e:
@@ -1111,7 +1324,9 @@ def validate(data, schema, context=None):
     # Remove any remaining missing fields and extra keys
     # You can unagument as many times as you like, it shouldn't change
     # the result after the first unagument
+    schema_type = type(schema)
     result = unaugment(result, schema)
+    assert type(schema) == schema_type
     # Remove any empty error fields
     err = []
     for k, v in errors.iteritems():
@@ -1155,7 +1370,7 @@ def convert(converter, key, converted_data, errors, context):
             try:
                 value = converter(converted_data.get(key))
             except Exception, e:
-                errors[key] = str(e)
+                errors[key] = [str(e)]
             else:
                 converted_data[key] = value
             return
@@ -1249,6 +1464,8 @@ def format_key(key, name='data'):
 
 def format_errors(errors, name='data'):
     result = 'The following errors occurred:\n'
+    if not isinstance(errors, list):
+        raise Exception("Expected errors to be a list, not: %r"%errors)
     for k, v in errors:
         result += '    %s: %s\n'%(format_key(k, name), '; '.join(v))
     return result
@@ -1264,6 +1481,9 @@ def format_errors(errors, name='data'):
 def single_dict(schema, error_msg='Failed to validate against the schema'):
     def validate_dict_converter(key, data, errors, context):
         value = data[key]
+        if not isinstance(value, dict):
+            errors[key].append('Not a dictionary')
+            return 
         result, err = validate(value, schema)
         if result:
             data[key] = result
@@ -1339,6 +1559,12 @@ def empty(key, data, errors, context):
         errors[key].append(_stdtrans(
             'The input field %(name)s was not expected.') % {"name": key[-1]})
 
+def missing_if_value_in(vars):
+    def missing_if_value_in_converter(key, data, errors, context):
+        if data[key] in vars:
+            data[key] = missing
+    return missing_if_value_in_converter
+
 def ignore(key, data, errors, context):
     value = data.pop(key, None)
     raise StopOnError()
@@ -1376,7 +1602,7 @@ def existing_file(key, data, errors, context):
 def default(default_value):
     def default_converter(key, data, errors, context):
         value = data.get(key)
-        if not value or value == missing:
+        if value == missing:
             data[key] = default_value
     return default_converter
 
@@ -1502,9 +1728,9 @@ main_help_template = """\
 %(summary)s
 %(usage)s
 
-%(opts)s
-
 %(args)s
+
+%(opts)s
 
 %(child_commands)s
 
@@ -1569,11 +1795,16 @@ def assemble_help(
     else:
         tip = ''
         if command.parent:
+            parents = []
+            c = command
+            while c.parent:
+                c = c.parent
+                parents.insert(0, c.name)
             tip = (
                 '\nType `%(program)s --help\' for '
                 'parent command options, arguments and other commands.'
             ) % {
-               'program': command.parent.program,
+               'program': '%s %s'%(command.parent.program, ' '.join(parents[1:])),
             }
     variables = dict(
         summary = summary,
@@ -1635,7 +1866,7 @@ def _logging_run(command):
 help_opt_spec = obj(
     name = 'help',
     flags = ['-h', '--help'],
-    help_msg = 'display this message'
+    help_msg = 'Display this message'
 )
 
 logging_command = obj(
@@ -1696,6 +1927,9 @@ def format_string(string, *args, **opts):
 def print_fn(string, *args, **opts):
     print format_string(string, *args, **opts),
 
+def print_err_fn(string, *args, **opts):
+    print >> sys.stderr, format_string(string, *args, **opts),
+
 class Command(object):
     def __init__(
         self,
@@ -1743,9 +1977,9 @@ class Command(object):
             )
 
     def __getitem__(self, name):
-        if self.parent and name == self.parent.name:
-            return self.parent
-        elif self.stack and name in self.aliases:
+        #if self.parent and name == self.parent.name:
+        #    return self.parent
+        if self.stack and name in self.aliases:
             alias = self.aliases[name]
             if not alias in self.stack.started.facilities:
                 self.stack.start(alias)
@@ -1831,7 +2065,6 @@ def ensure_no_default_or_converter_if_missing(key, data, errors, context):
                         data[sibling_key(key, 'name')],
                     )
                 )
-
 
 def parse_argv(
     arg_specs,
@@ -2121,7 +2354,7 @@ def handle_command(
     parent=None,
     stack=None,
     out=print_fn,
-    err=print_fn,
+    err=print_err_fn,
     help_opt_name='help',
     #facility_specs=None,
     spec=None,
@@ -2548,8 +2781,14 @@ def if_missing_uncollect_by(var, data_key):
             data[key] = uncollect_by(var, data[sibling_key(key, data_key)])
     return if_missing_uncollect_by_converter
 
+def add_help_opt_name(key, data, errors, context):
+    data[key] = 'help'
+
 def add_help_opt_spec(key, data, errors, context):
     help_opt_name = data[sibling_key(key, 'help_opt_name')]
+    if help_opt_name == missing or not help_opt_name: 
+        # XXX Something is seriously wrong here
+        help_opt_name = data[sibling_key(key, 'help_opt_name')] = 'help'
     found = False
     for item in data[key]:
         if item['name'] == help_opt_name:
@@ -2597,7 +2836,7 @@ command_definition_schema = ordered_obj({
     'arg_specs': [if_missing_uncollect_by('name', 'arg_specs_by_name'), default([])],#, arg_specs_schema],
     'arg_specs_by_name': [],
     # We must process the help_opt_name before opt_specs so that a default for the help can be added
-    'help_opt_name': [default('help')],
+    'help_opt_name': [add_help_opt_name],#default('help')],
     # Uses the help_opt_name to automatically add a help option if there isn't one
     'opt_specs': [if_missing_uncollect_by('name', 'opt_specs_by_name'), default([]), add_help_opt_spec],#, opt_specs_schema],
     'opt_specs_by_name': [],
@@ -2648,12 +2887,12 @@ facility_specs_schema = obj({
 
 run_schema = command_specs_schema.copy()
 run_schema.update({
-    'name': [default('command'), common_identifier_for('a name')],
-    'definition': [default(logging_command), single_dict(command_definition_schema)],
+    'name':          [missing_if_value_in([None]), default('command'), common_identifier_for('a name')],
+    'definition':    [missing_if_value_in([None]), default(logging_command), single_dict(command_definition_schema)],
     #'facility_specs': facility_specs_schema,
-    'out': [default(print_fn)],
-    'err': [default(print_fn)],
-    'help_opt_name': [default('help')],
+    'out':           [missing_if_value_in([None]), default(print_fn)],
+    'err':           [missing_if_value_in([None]), default(print_fn)],
+    'help_opt_name': [missing_if_value_in([None]), default('help')],
 })
 
 class SharedStack(object):
@@ -3099,7 +3338,7 @@ class Stack(object):
 #    prepare=config_facility_definition_prepare
 #)
 
-def flow(shared, bag=None, run=None):
+def flow(shared, run=None, bag=None):
     #for name in ensure:
     #    if ensure.count(name)>1:
     #        raise Exception('The facility %r is specified more than once in the ensure argument'%name)
@@ -3191,7 +3430,7 @@ def run(
     option=None,
     run=None,
     out=print_fn,
-    err=print_fn,
+    err=print_err_fn,
     help_opt_name='help',
     alias_specs=None,
 ):
@@ -3705,7 +3944,7 @@ def process(
                 if not line:
                     break
                 if echo:
-                    print line
+                    print line,
                 output.write(line)
     elif merge:
         raise Exception("The 'merge' option doesn't work with a custom 'out' function")
@@ -3718,7 +3957,7 @@ def process(
                 if not line:
                     break
                 if echo:
-                    print line
+                    print line,
                 output.write(line)
     elif merge:
         raise Exception("The 'merge' option doesn't work with a custom 'err' function")

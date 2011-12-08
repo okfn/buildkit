@@ -4,6 +4,17 @@ Changes
 0.2.2
 -----
 
+2011-12-08
+~~~~~~~~~~
+
+* Separated key generation from install of ``buildkit-apt-repo``.
+* Made repo and key base directory settings options of the ``buildkit repo`` 
+  command so that its subcommands can just use repository names
+* Added a ``repo installkey`` command so that key generation can be customised
+  and doesn't have to happen at install time
+* Made ``supervisor`` a dependency of ``buildkit-vm`` and added a sample
+  config file
+
 2011-12-07
 ~~~~~~~~~~
 
@@ -39,8 +50,8 @@ Changes
 ~~~~~~~~~~
 
 * Complete overhaul to support the creation of Debian packages from Python
-  software, add them to a repository and test them in virtual machines on Ubuntu
-  LTS.
+  software, add them to a repository and test them in virtual machines on 
+  Ubuntu LTS.
 
 0.1.2
 -----

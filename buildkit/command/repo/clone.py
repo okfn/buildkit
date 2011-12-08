@@ -9,7 +9,7 @@ from buildkit import stacks
 arg_specs = [
     dict(
         metavar='CLONE', 
-        help_msg='the path to the repository to clone',
+        help_msg='the name of the repository to clone',
     ),
     dict(
         metavar='NEW_REPO_NAME',
@@ -18,12 +18,19 @@ arg_specs = [
 ]
 
 def run(cmd):
-    if not os.path.exists(os.path.join(cmd.args[0], 'conf')):
-        cmd.err('The directory %r does not appear to be a repository')
+    src = stacks.uniform_path(
+        os.path.join(
+            cmd.parent.opts.base_repo_dir, 
+            cmd.args[0],
+        )
+    )
+    if not os.path.exists(os.path.join(src, 'conf')):
+        cmd.err('The directory %r does not appear to be a repository', src)
         return 1
     dst = os.path.join(
-        os.path.dirname(cmd.args[0]),
+        cmd.parent.opts.base_repo_dir,
         cmd.args[1],
     )
-    shutil.copytree(cmd.args[0], dst)
+    shutil.copytree(src, dst)
+    cmd.out('done.')
 

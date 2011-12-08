@@ -55,7 +55,7 @@ buildkit_ensure_user_and_group () {
 }
 
 buildkit_ensure_public_key() {
-    if [ $# -lt 6 ]
+    if [ $# -lt 5 ]
     then
         echo "Not enough arguments"
         exit 1
@@ -63,12 +63,12 @@ buildkit_ensure_public_key() {
     NAME=$1
     EMAIL=$2
     COMMENT=$3
-    PASSWORD=$4
-    KEYDIR=$5
-    REPOBASE=$6
+    KEYDIR=$4
+    REPOBASE=$5
     if [ ! -e "$REPOBASE/package_public.key" ]
     then
-        echo "Creating key in $KEYDIR with name $NAME, email $EMAIL, passphrase $PASSWORD and comment $COMMENT ..."
+        #sudo -u buildkit mkdir -p $REPOBASE
+        echo "Creating key in $KEYDIR with name $NAME, email $EMAIL, comment $COMMENT ..."
         # Check we haven't already created the home directory
         if [ ! -d "$KEYDIR" ]
         then
@@ -166,7 +166,7 @@ buildkit_ensure_apache() {
 	</VirtualHost>
 	EOF
     sudo a2ensite buildkit-repo
-    sudo /etc/init.d/apache2 restart
+    sudo /etc/init.d/apache2 reload
 }
 
 buildkit_ensure_apt_cacher() {

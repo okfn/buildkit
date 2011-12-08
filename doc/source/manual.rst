@@ -185,6 +185,9 @@ you've unmounted it again):
     sudo mount -t ext4 -o loop,offset=512 /var/lib/buildkit/vm/${NEWVMNAME}/disk.raw /var/lib/buildkit/vmtmp
     # Make your changes...
     # Edit /etc/hostname and ensure the new hostname appears in /etc/hosts
+    # Edit /etc/network/interfaces
+    # Set a new passwd for the ubuntu user
+    # Create a new SSH identity
     sudo umount /var/lib/buildkit/vmtmp
 
 Now let's start it (change eth1 for your network interface):
