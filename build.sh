@@ -1,7 +1,7 @@
 #!/bin/bash
 
 VERSION=0.2.2
-PACKAGEVERSION=03
+PACKAGEVERSION=07
 
 rm -r dist/buildkit
 if [ ! -d "dist/buildkit" ] 

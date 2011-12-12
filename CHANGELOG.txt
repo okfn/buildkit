@@ -4,6 +4,12 @@ Changes
 0.2.2
 -----
 
+2011-12-10
+~~~~~~~~~~
+
+* Changed ``apt-cacher-ng`` to run on port 3142 to avoid a potential conflict
+   with ``supervisor``
+
 2011-12-08
 ~~~~~~~~~~
 

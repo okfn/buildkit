@@ -51,8 +51,8 @@ def valid_ip(address):
 def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=None, base_name='buildkit'):
     if packages is None:
         packages = []
-    # Need to check apt-proxy is set up on port 9999
-    # http://127.0.0.1:9999/ubuntu/ gives "ERROR 403 - too few slashes in URI /ubuntu"
+    # Need to check apt-proxy is set up on port 3142
+    # http://127.0.0.1:3142/ubuntu/ gives "ERROR 403 - too few slashes in URI /ubuntu"
     args = dict(
         vm_ip_part=vm_ip_part,
         base_ip=base_ip,
@@ -80,7 +80,7 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
         --bcast %(base_ip)s.255 \
         --gw %(base_ip)s.254 \
         --dns %(base_ip)s.254 \
-        --proxy http://%(proxy_ip)s:9999/ubuntu \
+        --proxy http://%(proxy_ip)s:3142/ubuntu \
         --components main,universe \
         --addpkg openssh-server
     """%args

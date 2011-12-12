@@ -33,8 +33,11 @@ Buildkit also used to do:
 
 These features will be added back in a future release.
 
-Buildkit Tutorial
-=================
+Legacy Buildkit Tutorial
+========================
+
+WARNING: This entire tutorial is now out of date since buildkit has been split into 5 different products. Please ignore entirely.
+
 
 .. caution ::
 
@@ -63,7 +66,7 @@ like this:
 
 ::
 
-    sudo apt-get install ubuntu-vm-builder python-vm-builder gawk kvm sed findutils rsync apache2 reprepro gnupg wget dh-make devscripts build-essential fakeroot alien cdbs python-pip python-virtualenv subversion mercurial git-core apt-proxy kvm-pxe uml-utilities
+    sudo apt-get install ubuntu-vm-builder python-vm-builder gawk kvm sed findutils rsync apache2 reprepro gnupg wget dh-make devscripts build-essential fakeroot alien cdbs python-pip python-virtualenv subversion mercurial git-core supervisor kvm-pxe uml-utilities apt-cacher-ng python-medusa python-meld3
 
 When the email configuration pops up choose "Internet Site" then accept the
 hostname suggested (or choose your own).
@@ -116,7 +119,7 @@ to 127.0.0.1:
     127.0.0.1       localhost host.buildkit
 
 At this point your repository will be running at http://host.buildkit and
-apt-proxy will be installed and running at http://host.buildkit:9999/ . The
+apt-cacher-ng will be installed and running at http://host.buildkit:3142/ . The
 latter will give you an error about not enough slashes in the URL if you visit
 it because it only expects to be visited with a full package path.
 
@@ -137,22 +140,22 @@ Check you have support for KVM:
 
 You can create a VM without KVM support but you won't be able to run it. Here's
 how you create one (the ``--proxy`` argument should be the IP address of the system
-running apt-proxy, in this case your local machine):
+running apt-cacher-ng, in this case your local machine):
 
 ::
 
     IP=`/sbin/ifconfig $NETWORK_DEVICE | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}' | grep -v "127.0.0.1" | grep -v "192.168.100."`
     sudo buildkit vm create --proxy $IP -o /var/lib/buildkit/vm/ 10
 
-You can check that apt-proxy has been used like this:
+You can check that apt-cacher-ng has been used like this:
 
 ::
 
-    sudo ls /var/cache/apt-proxy/ubuntu/pool/main/
+    sudo ls /var/cache/apt-cacher-ng/ubuntu/pool/main/
 
 If the directory exists and is populated, the files from here will be used next
 time you create a VM. The creation takes nearly as long though because files
-are still pulled in over HTTP, just served from apt-proxy rather than direclty.
+are still pulled in over HTTP, just served from apt-cacher-ng rather than direclty.
 It does save bandwidth though.
 
 In reality it is usually easier to just copy the ``.qcow2`` VM disk file to create
@@ -498,6 +501,7 @@ There are some gotchas to be aware of with ``buildkit`` so far:
   content. It is therefore best to never have information in ``__init__.py``
   files which is why, for extensions, we now have plugins implemented in
   ``plugin.py`` rather than ``__init__.py``.
+* The ``dist`` facility ``rsync`` command seems to be excluding too much
 * Packaging sometimes strips our key directories, such as any named ``dist``,
   they just won't be present in the packaged version.
 
@@ -517,10 +521,6 @@ enhancements:
 Other ideas:
 
 * Make the buildkit-vm-create command part of the buildkit command
-* Swap apt-proxy for something that also caches downoads from virutal machines
-  (it currently gives bad header lines which seems to be a known, yet
-  unresolved issue) so there is no caching of install packages used in the
-  VMs.
 * Document how to install the different commands
 * Make the VMs able to access the host even without an external network
 

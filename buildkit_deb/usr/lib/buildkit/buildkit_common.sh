@@ -65,6 +65,7 @@ buildkit_ensure_public_key() {
     COMMENT=$3
     KEYDIR=$4
     REPOBASE=$5
+    mkdir -p $REPOBASE
     if [ ! -e "$REPOBASE/package_public.key" ]
     then
         #sudo -u buildkit mkdir -p $REPOBASE
@@ -95,13 +96,15 @@ buildkit_ensure_public_key() {
 	%commit
 	%echo done
 	EOF
+            echo "Generating the key (as $USER) ..."
+            echo "Going to run: gpg --batch --gen-key ${KEYDIR}/buildkit_settings; rm ${KEYDIR}/buildkit_settings; gpg --homedir ${KEYDIR} --allow-secret-key-import --import ${KEYDIR}/buildkit.sec; gpg --armor --keyring ${KEYDIR}/buildkit.pub --secret-keyring ${KEYDIR}/buildkit.sec --output ${REPOBASE}/packages_public.key --export $EMAIL;"
             gpg --batch --gen-key ${KEYDIR}/buildkit_settings
             rm ${KEYDIR}/buildkit_settings
             gpg --homedir ${KEYDIR} --allow-secret-key-import --import ${KEYDIR}/buildkit.sec
             echo "Exporting the key ..."
             gpg --armor --keyring ${KEYDIR}/buildkit.pub --secret-keyring ${KEYDIR}/buildkit.sec --output ${REPOBASE}/packages_public.key --export $EMAIL
-            sudo chown buildkit:www-data ${REPOBASE}/packages_public.key
-            sudo chmod g+r ${REPOBASE}/packages_public.key
+            #chown buildkit:www-data ${REPOBASE}/packages_public.key
+            #chmod g+r ${REPOBASE}/packages_public.key
         fi
     fi
 }
@@ -176,8 +179,8 @@ buildkit_ensure_apt_cacher() {
 	EOF
     echo "done."
     echo "Updating /etc/apt-cacher-ng/acng.conf ..."
-    sed -e "s,Port:3142,Port:9999," \
-        -e "s,; file:backends_debvol, ;  file:backends_debvol\nRemap-ubusec: file:ubuntu_security /ubuntu-security ; http://security.ubuntu.com/ubuntu," \
+    sed -e "s,; file:backends_debvol, ;  file:backends_debvol\nRemap-ubusec: file:ubuntu_security /ubuntu-security ; http://security.ubuntu.com/ubuntu," \
                 -i /etc/apt-cacher-ng/acng.conf
+        #-e "s,Port:3142,Port:9999," \
     echo "done."
 }

@@ -13,93 +13,24 @@ Outstanding Issues
 ToDo
 ====
 
-* Get tests passing
-* Rename facility functions to avoid conflicts with actions
-  * create        -> facility_create
-  * start         -> facility_start
-  * stop          -> facility_stop
-  * error         -> facility_error
-  * option_schema -> config_schema
-* Move start() out of the Facility
-* Allow the use of init() to set variables dynamically
-* Add a ``facility_getattr()`` method which determines how facility 
-  attributes are routed. This would allow our http object to route things
-  like ``.response``directly whilst also providing a place for conflict 
-  warning messages to go
-* Make the facility and command discovery code return by name
-* Change FacilityFunction to be called ``FacilityActions`` and to be the
-  ``.actions`` attribute of a facility [rules for what is an action is
-  everything that is a function, documented in the schema]
-* Add a ``FacilityDependencies`` class to be the ``.deps`` attribute of
-  commands and facilities
-* Only create the ``.local`` variable after ``facility_create()``
-* Upgrade logging to show the ID of the shared stack, the stack and the 
-  facility
-* Deprecate the use of bag and instead allow facilities to have an init()
+For 0.2.0:
+
+* Have an optional update_config schema applied to each faciltiy before 
+  ``facility_create`` so that an app writer can control user's input.
+* Hooks that rely on facilites can be used to register URL lookups and
+  dispatchers
+* Hook can have lookup_url, build_url, dispatch
+* Convert URLConvert later as a separate project
+* Mail should have email validation library
 * Hooks currently need to be loaded in order to work. Need to allow hooks
   to be added dynamically in create() and also to maybe have named hooks
   name -> type (eg load_driver)
   name -> New attribute which allows loading hook by name eg (postgresql)
 
-
-So, for web stuff 
-* ``tornado_handler()`` will call ``stack.http.init(environ, status, headers, exc_info)``
-* That code will route however it likes, most likley with an algorithm like:
-  * Start key facilities like error_report, etc
-  * Make adjustments for X_HTTP_FORWARDED_FOR etc
-  * Load the ``apps`` facility to provide routing to different URLs
-  * Use a ``resolve`` facility to resolve a location from the ones provided by the ``apps`` extension
-  * Use a ``static`` facility to try to serve a static file from the ``resolve`` 
-  * Look for facilities named ``web_*`` and route the first part of the path
-    to there or to ``web_index`` if there is none. These should have a ``dispatch``
-    action and OR use hooks to dispatch via ``apps``.
-  * Have the concept of dispatch to "controllers" which are just modules with
-    
-
-       pipe('errorreport', 'errorreport:ErrorReportPipe'),
-       pipe('apps', 'appdispatch:URLDispatchPipe'),
-       pipe('template', 'dreamweavertemplate.service:DwtPipe'),
-       pipe('errordocument', 'errordocument:ErrorDocumentPipe'),
-       pipe('ticket', 'authtkt.service:AuthTktPipe'),
-       pipe('user',  'usermanager.driver.postgresql:PostgreSQLUserManager'),
-       pipe('database', 'databasepipe.service.connection:DatabasePipe'),
-       pipe('jinja2', 'jinja2pipe:Jinja2Pipe'),
-       pipe('input', 'httpkit.service.input:InputPipe'),
-       pipe('query', 'httpkit.service.query:QueryPipe'),
-       pipe('flash', 'flashmessage:FlashMessagePipe'),
-       pipe('api', 'thirdbuddy.api:RootAPIPipe'),
-       # Apps
-       pipe('auth', 'authtkt.app:AuthApp'),
-       pipe('root', 'thirdbuddy.root:IndexPipe'),
-       # Static files
-       pipe('resolve', 'staticdispatch:ResolvePipe'),
-       pipe('static',  'staticdispatch:StaticPipe'),
-       # Manta
-       pipe('manta_store',   'manta.store:MantaStorePipe'    ),
-       pipe('manta_rewrite', 'manta.rewrite:MantaRewritePipe', aliases=dict(store='manta_store', page='manta_page')),
-       pipe('manta_block',   'manta.block:MantaBlockPipe'    ),
-       pipe('manta_page',    'manta.page:MantaPagePipe', aliases=dict(store='manta_store')),
-       pipe('manta_create',  'manta.create:MantaCreatePipe'  ),
-       pipe('manta_edit',  'manta.edit:MantaEditPipe'  ),
-       # 404
-       pipe('not_found', 'httpkit.service.not_found:NotFoundPipe'),
-
-I'd imagine that apps are their own plugin type and that each one has hooks to each of the things it uses:
-* templates
-* routing and dispatch
-
-Options are:
-1. Have an app class which all the various facilities are aware of and deal with via an apps facility
-2. Have an app class which wraps the functionality of the facilities it uses to make it availble to its own controllers
-3. Register hooks for every app directly with every facility it uses (possibly with bulk register functionality)
-4. Have a facility for each app which provides functions the rest of the app will use.
-
-
 Less important
 ==============
 
 * Replace all wrap code with my own algorithm
-* Replace getattr code with explict checks
 * Write no_duplicate_names(key, data, errors, context):
 * Write all_aliased_facilites_exist(key, data, errors, context):
 * Rename faclify.run to something else to not confuse with process()
@@ -111,6 +42,8 @@ Ideas
 * You can put pdb anywhere, including doctests to debug
 * You can override the entire way command help works with a function that
   takes the command too?
+* Recommend the use of init() to set variables dynamically if you need
+  to set up a facility with say, ``environ``
 """
 
 version = '0.1.1'
@@ -1151,7 +1084,7 @@ def validate(data, schema, context=None):
         >>> schema = {
         ...    "commands": {
         ...         "definition": {
-        ...             "run": [not_missing, upper],
+        ...             "run": [not_missing(), upper],
         ...         }
         ...     }
         ... }
@@ -1214,7 +1147,7 @@ def validate(data, schema, context=None):
         ...     'one': [
         ...         default([]),
         ...         {
-        ...             'two': [not_missing],
+        ...             'two': [not_missing()],
         ...         }
         ...     ]
         ... }
@@ -1257,7 +1190,18 @@ def validate(data, schema, context=None):
     # Take a copy of the data to work with, we don't want to mess up the
     # original. We have to do this all in one go so that Python can catch
     # circular dependencies etc
-    data = copy.deepcopy(data)
+    d = type(data)()
+    for k, v in data.iteritems():
+        if inspect.ismodule(v):
+            d[k] = v
+        else:
+            try:
+                d[k] = copy.deepcopy(v)
+            except copy.Error, e:
+                # If we can't copy it, we just have to use the original, but the item is unlikely to be a dictionary or list anyway
+                # XXX Is this OK?
+                d[k] = v
+    data = d
     log.debug('Copied data: %r', data)
     # Augment the data with a value of ``missing`` for any keys in the
     # schema which aren't present and move any extra keys to ``extra_keys``
@@ -1508,56 +1452,51 @@ def stop_if_missing(key, data, errors, context):
     if value == missing:
         raise StopOnError()
 
-def split(on=','):
+def split(on=',', missing_error=u'Missing value'):
     def split_converter(key, data, errors, context):
         value = data.get(key)
         if value == missing:
-            errors[key].append(_stdtrans(u'Missing value'))
+            errors[key].append(_stdtrans(missing_error))
             raise StopOnError()
         else:
             data[key] = [x.strip() for x in value.split(on)]
     return split_converter
 
-def not_present(key, data, errors, context):
-    value = data.get(key)
-    if value != missing:
-        errors[key].append(_stdtrans(u'Unexpected value'))
-        raise StopOnError()
-
-def not_missing(key, data, errors, context):
-    value = data.get(key)
-    if value == missing:
-        errors[key].append(_stdtrans(u'Missing value'))
-        raise StopOnError()
-
-def not_empty(key, data, errors, context):
-    value = data.get(key)
-    if not value or value == missing:
-        errors[key].append(_stdtrans(u'Missing value'))
-        raise StopOnError()
-
-def if_empty_same_as(other_key):
-    def callable(key, data, errors, context):
+def value(value):
+    def value_converter(key, data, errors, context):
+        data[key] = value
+    return value_converter
+    
+def not_present(error=u'Unexpected value'):
+    def not_present_converter(key, data, errors, context):
         value = data.get(key)
-        if not value or value == missing:
-            data[key] = data[key[:-1] + (other_key,)]
-    return callable
-
-def both_not_empty(other_key):
-    def callable(key, data, errors, context):
-        value = data.get(key)
-        other_value = data.get(key[:-1] + (other_key,))
-        if (not value or value == missing and
-            not other_value or other_value == missing):
-            errors[key].append(_stdtrans(u'Missing value'))
+        if value != missing:
+            errors[key].append(_stdtrans(error))
             raise StopOnError()
-    return callable
+    return not_present_converter
 
-def empty(key, data, errors, context):
-    value = data.pop(key, None)
-    if value and value != missing:
-        errors[key].append(_stdtrans(
-            'The input field %(name)s was not expected.') % {"name": key[-1]})
+def not_missing(error=u'Missing value'):
+    def not_missing_converter(key, data, errors, context):
+        value = data.get(key)
+        if value == missing:
+            errors[key].append(_stdtrans(error))
+            raise StopOnError()
+    return not_missing_converter
+
+def not_empty(error=u'Missing value'):
+    def not_empty_converter(key, data, errors, context):
+        value = data.get(key)
+        if not value:
+            errors[key].append(_stdtrans(error))
+            raise StopOnError()
+    return not_empty_converter
+
+def default_same_as(other_key):
+    def default_same_as_converter(key, data, errors, context):
+        value = data.get(key)
+        if value == missing:
+            data[key] = data[key[:-1] + (other_key,)]
+    return default_same_as_converter
 
 def missing_if_value_in(vars):
     def missing_if_value_in_converter(key, data, errors, context):
@@ -1795,16 +1734,19 @@ def assemble_help(
     else:
         tip = ''
         if command.parent:
-            parents = []
+            parents_list = []
             c = command
             while c.parent:
                 c = c.parent
-                parents.insert(0, c.name)
+                parents_list.insert(0, c.name)
+            parents = ' '.join(parents_list[1:])
+            if parents.strip():
+                parents = ' '+parents.strip()
             tip = (
                 '\nType `%(program)s --help\' for '
                 'parent command options, arguments and other commands.'
             ) % {
-               'program': '%s %s'%(command.parent.program, ' '.join(parents[1:])),
+               'program': '%s%s'%(command.parent.program, parents),
             }
     variables = dict(
         summary = summary,
@@ -1957,7 +1899,10 @@ class Command(object):
         self.args = args
         self.opts = opts
         if log is None:
-            self.log = Log(name=self.name)
+            args = dict(type='command', id=id(self))
+            if stack is not None:
+                args.update(dict(stack_id=id(self.stack), shared_stack_id=id(self.stack.shared)))
+            self.log = Log(self.name, **args)
         else:
             self.log = log
         if warn is None:
@@ -2380,7 +2325,7 @@ def handle_command(
         Usage: run.py test [OPTIONS]
         <BLANKLINE>
         Options:
-          -h --help             display this message
+          -h --help             Display this message
         <BLANKLINE>
         Type `run.py --help' for parent command options, arguments and other commands.
         >>> result
@@ -2641,14 +2586,35 @@ class Log(object):
         blog.log.info("Running the one() function with the value %r", value)
 
     """
-    def __init__(self, name, wrap_width=default_wrap_width, tabwidth=2):
+    def __init__(
+        self,
+        name, 
+        type=None,
+        id=None,
+        stack_id=None,
+        shared_stack_id=None,
+        wrap_width=default_wrap_width,
+        tabwidth=2,
+    ):
         self.handler = logging.getLogger(name)
         self.wrap_width = wrap_width
         self.tabwidth = tabwidth
+        self.prepend = ''
+        if shared_stack_id:
+            self.prepend += ' shared=%s'%(shared_stack_id,)
+        if stack_id:
+            self.prepend += ' stack=%s'%(stack_id,)
+        if type and id:
+            self.prepend += ' %s=%s'%(type, id)
+        self.prepend = self.prepend.strip()
 
     def _log(self, level, string):
-        self.handler.log(level, string)
-        return string
+        if self.prepend:
+            message = '[%s] %s'%(self.prepend, string)
+        else:
+            message = string
+        self.handler.log(level, message)
+        return message
 
     def error(self, string, *args):
         return self._log(40, _wrap(string, args, self.wrap_width))
@@ -2804,15 +2770,15 @@ def add_help_opt_spec(key, data, errors, context):
 #
 
 alias_spec_schema = obj({
-    'name': [not_missing, common_identifier_for('an alias')],
-    'facility': [not_missing, common_identifier_for('a facility')],
+    'name': [not_missing(), common_identifier_for('an alias')],
+    'facility': [not_missing(), common_identifier_for('a facility')],
     extra_keys: [not_present],
 })
 
 opt_specs_schema = obj({
-    'name': [not_missing],# common_identifier_for('a name')],
-    'flags': [not_missing, valid_options],
-    'help_msg': [not_missing],
+    'name': [not_missing()],# common_identifier_for('a name')],
+    'flags': [not_missing(), valid_options],
+    'help_msg': [not_missing()],
     'default': [],
     'converter': [],
     'metavar': [ensure_no_default_or_converter_if_missing, stop_if_missing, uppercase_alpha],
@@ -2821,7 +2787,7 @@ opt_specs_schema = obj({
 })
 
 arg_specs_schema = obj({
-    'metavar': [not_missing, uppercase_alpha],
+    'metavar': [not_missing(), uppercase_alpha],
     'help_msg': opt_specs_schema['help_msg'],
     'min': [stop_if_missing, instance_of(int)],
     'not_enough_extra_args_error': [stop_if_missing, instance_of((unicode, str))],
@@ -2845,13 +2811,13 @@ command_definition_schema = ordered_obj({
     'help_template': [default(help_template)],
     # Optional, used to ensure aliase are matched correctly
     'facility_names': [],
-    'run': [not_missing],
+    'run': [not_missing()],
     # The after callback is optional
     'after': [],
 })
 
 command_specs_schema = ordered_obj({
-    'name': [not_missing, common_identifier_for('a command')],
+    'name': [not_missing(), common_identifier_for('a command')],
     'spec': [get_missing_definitions, stop_if_missing],
     'definition': [stop_if_missing, single_dict(command_definition_schema)],
     # This overrides any summary set as an attribute of the definition
@@ -2862,22 +2828,21 @@ command_specs_schema = ordered_obj({
     'child_command_specs': [],
 })
 
-
 facility_specs_schema = obj({
-    'name': [not_missing, common_identifier_for('a facility')],
+    'name': [not_missing(), common_identifier_for('a facility')],
     'spec': [validate_facility_spec],
     
      # XXX No facility definition yet
      # Should exclude:
      # * all the things here
-     # * start, stop, error, create, option_schema
+     # * start, stop, error, create, config_schema
      # * local, stack, shared, deps, actions
      # * config, log, aliases, hooks
      # * anything starting on_ or _
     'definition': [],
     'alias_specs': alias_spec_schema,
     'hook_specs': obj({
-         #'facility': [not_missing, common_identifier_for('the target facility')],
+         #'facility': [not_missing(), common_identifier_for('the target facility')],
          'importable': [],
          'stack': [],
          'definition': [],
@@ -2915,14 +2880,13 @@ class SharedStack(object):
         self.config=obj()
         self.shared_facility_state=obj()
 
-    def stack(self, bag=None):
+    def stack(self):
         """\
         Return a new stack, sharing the same state as any other stacks returned from this multistack
         """
         self.stack_count += 1
         return Stack(
             self,
-            bag=bag,
         )
 
     def clone(self):
@@ -2951,8 +2915,8 @@ def uncollect_by(var, data):
         result.append(v)
     return result
 
-def collect_by(var='name', data=None):
-    result = {}
+def collect_by(var, data=None):
+    result = OrderedDict()
     if data is None:
         data = {}
     for item in data:
@@ -2966,7 +2930,6 @@ def collect_by(var='name', data=None):
             result[item[var]] = item
     return result
 
-
 import inspect
 class Facility(object):
 
@@ -2979,7 +2942,7 @@ class Facility(object):
         log=None, 
         warn=None, 
         # Copied here, for convenience only, not used
-        option_schema=None,
+        config_schema=None,
         spec=None,
         definition=None,
         hook_specs=None,
@@ -2993,60 +2956,109 @@ class Facility(object):
         # This gets populated with data from the first time a facility is used
         self.shared = None
         if log is None:
-            self.log = Log(self.name)
+            self.log = Log(self.name, type='facility', id=id(self), stack_id=id(self.stack), shared_stack_id=id(self.stack.shared))
         else:
             self.log = log
         if warn is None:
             self.warn = Warn()
         else:
             self.warn = warn
-        self.local = obj()
         # These don't do anything, but we keep them here so that if anyone does dir(facility) in the Python interactive prompt they can see the values we are using
         # We need to set this a slightly complicated way so that it doesn't
         # cause problems with the __getattr__() code below.
         self.__dict__['definition'] = definition or stack.shared.facility_specs_by_name[self.name].definition
-        self.option_schema = option_schema
+        self.config_schema = config_schema
         self.spec = spec
         self.hook_specs = hook_specs
+        # Set up the actions
+        self.actions = dict()
+        for name, action in self.__dict__['definition'].items():
+            if action and (not name.startswith('facility_') or name.startswith('_')) and inspect.isfunction(action):
+                a = [action]
+                args, varargs, keywords, defaults = inspect.getargspec(action)
+                if args and (\
+                   args[0] == self.__dict__['name'] or args[0] == 'facility'):
+                    self.actions[name] = FacilityAction(self, action, name)
+        # Set up dynamically loaded dependencies
+        self.deps = FacilityDeps(self)
+        # Local gets set to ``obj()`` in ``start()`` after the facility's create event
+        self.local = None#obj()
 
     def hooks(self, hook_name):
         return self.stack.hooks(self.name, hook_name)
 
+    # XXX Could create rules here to prevent things being accidentally set at key points
+    # def __setattr__(self, name):
+    #    pass
+
     def __getattr__(self, name):
+        # If a lookup function is defined, use it:
+        if self.__dict__['definition'].has_key('facility_attribute'):
+            return self.__dict__['definition']['facility_attribute'](self, name)
+        # Otherwise use the default which is: class, actions, deps, shared, local
         if name in self.__dict__:
-            return self.__dict__[name]
-        if name in self.__dict__.get('definition', []):
-            attribute = self.__dict__['definition'].get(name)
-            if attribute and inspect.isfunction(attribute):
-                args, varargs, keywords, defaults = inspect.getargspec(attribute)
-                if args and (\
-                   args[0] == self.__dict__['name'] or args[0] == 'facility'):
-                    return FacilityFunction(self, attribute)
-                # XXX What about not allowing these attributes? 
-                # return self.__getitem__(name)
-            return attribute
-        return self.__getitem__(name)
+            return self.__dict__['name']
+        elif name in self.actions:
+            return self.actions[name]
+        elif name in self.actions:
+            return self.actions[name]
+        try:
+            return self.deps[name]
+        except KeyError:
+            pass#raise AttributeError('No such attribute, action or facility dependency %r'%name)
+        if name in self.shared:
+            return self.shared[name]
+        if self.local is not None and name in self.local:
+            return self.local[name]
+        raise AttributeError('No such attribute %r for facility %r'%(name, self.name))
 
-    def __getitem__(self, name):
-        if name in self.aliases:
-            alias = self.aliases[name]
-            if not self.stack.has_key(alias):
-                self.stack.start(alias)
-            return self.stack[alias]
-        elif self.stack and name in self.stack.shared.facility_specs_by_name:
-            if not self.stack.has_key(name):
-                self.stack.start(name)
-            return self.stack[name]
-        else:
-            raise KeyError('No such facility %r'%name)
-
-    def __repr__(self):
+    def __str__(self):
         return '<class Facility name=%r shared=%r stack=%r id=%r>'%(
             self.__dict__['name'],
             id(self.__dict__['stack'].shared),
             id(self.__dict__['stack']),
             id(self),
         )
+
+class FacilityAction(object):
+    def __init__(self, facility, action, name):
+        self._facility = facility
+        self._action = action
+        self._name = name
+
+    def __call__(self, *k, **p):
+        return self._action(self._facility, *k, **p)
+
+    def __str__(self):
+        return u'<FacilityAction %s(%s) shared=%r stack=%r facility=%r(%r)>'%(
+            id(self._name),
+            id(self),
+            id(self._facility.__dict__['stack'].shared),
+            id(self._facility.__dict__['stack']),
+            self._facility.__dict__['name'],
+            id(self._action),
+        )
+
+class FacilityDeps(object):
+    def __init__(self, facility):
+        self._facility = facility
+
+    def __getitem__(self, name):
+        # Anything that is present in the stack or is an alias of another _facility is a valid dependency
+        if name in self._facility.aliases:
+            alias = self._facility.aliases[name]
+            if not self._facility.stack.has_key(alias):
+                self._facility.stack.start(alias)
+            return self._facility.stack[alias]
+        if self._facility.stack and name in self._facility.stack.shared.facility_specs_by_name:
+            if not self._facility.stack.has_key(name):
+                self._facility.stack.start(name)
+            return self._facility.stack[name]
+        else:
+            raise KeyError('No such facility dependency %r'%name)
+
+    def __getattr__(self, name):
+        return self.__getitem__(name)
 
 import cgitb
 def text_traceback():
@@ -3057,28 +3069,12 @@ def text_traceback():
         ).strip()
     return res
 
-class FacilityFunction(object):
-    def __init__(self, facility, function):
-        self.facility = facility
-        self.function = function
-
-    def __call__(self, *k, **p):
-        return self.function(self.facility, *k, **p)
-
-    def __repr__(self):
-        return '<FacilityFunction %s.%s() id=%r>'%(
-            self.facility.name,
-            self.function.__name__,
-            id(self),
-        )
-
 class Stack(object):
     # Keeps self.started.facilities = track of the order of pipes
-    def __init__(self, shared, bag=None):
+    def __init__(self, shared):
         self.shared = shared
         self.started = obj()
-        self.bag = bag
-        self.started['facilities'] = OrderedDict(self.bag or {})
+        self.started['facilities'] = OrderedDict()
         self.finished = False
         self.started['hooks'] = obj()
 
@@ -3226,7 +3222,10 @@ class Stack(object):
                 if hasattr(facility, 'definition'):
                     if not error:
                         try:
-                            if hasattr(facility.definition, 'stop'):
+                            if hasattr(facility.definition, 'facility_stop'):
+                                facility.definition.facility_stop(facility)
+                            elif hasattr(facility.definition, 'stop'):
+                                facility.warn.deprecated('The stop() action is deprecated')
                                 facility.definition.stop(facility)
                             del self.started.facilities[name]
                         except Exception, e:
@@ -3237,11 +3236,17 @@ class Stack(object):
                                 name,
                                 text_traceback(),
                             )
-                            if hasattr(facility.definition, 'error'):
+                            if hasattr(facility.definition, 'facility_error'):
+                                facility.definition.facility_error(facility)
+                            elif hasattr(facility.definition, 'error'):
+                                facility.warn.deprecated('The error() action is deprecated')
                                 facility.definition.error(facility)
                             error = True
                     else:
-                        if hasattr(facility.definition, 'error'):
+                        if hasattr(facility.definition, 'facility_error'):
+                            facility.definition.facility_error(facility)
+                        elif hasattr(facility.definition, 'error'):
+                            facility.warn.deprecated('The error() action is deprecated')
                             facility.definition.error(facility)
             except Exception, e:
                 tb = text_traceback()
@@ -3262,6 +3267,8 @@ class Stack(object):
                 error = True
 
     def start(self, name):
+        if self.finished:
+            raise Exception('This stack has already been finsished')
         if name in self.started.facilities:
             raise Exception('The facility %r has already been started'%name)
         # Otherwise if the facility is not part of the stack, throw an error
@@ -3281,13 +3288,13 @@ class Stack(object):
             else:
                 option = {}
             # Let's set up the config
-            schema = obj(getattr(facility_spec.definition, 'option_schema', {}))
+            schema = obj(getattr(facility_spec.definition, 'facility_config_schema', {}))
             result, error = validate(option, schema)
             if error:
                 raise Exception('Error parsing config file. %s'%format_errors(error, "option['"+name+"']"))
             self.shared.config[name] = result
             result, error = validate(
-                {'alias_specs':getattr(facility_spec.definition, 'alias_specs', [])},
+                {'alias_specs': getattr(facility_spec.definition, 'facility_alias_specs', [])},
                 obj({'alias_specs':alias_spec_schema}),
             )
             if error:
@@ -3302,6 +3309,8 @@ class Stack(object):
                     cur_alias_specs.append(alias_spec)
             # XXX self.shared.config[name] = result
             facility_spec['alias_specs'] = cur_alias_specs
+        else:
+            schema = obj()
         # XXX Need to check the attributes of the facility don't
         #      interfere with any alias_specs etc
         facility = Facility(
@@ -3310,7 +3319,7 @@ class Stack(object):
             config=self.shared.config[name],
             alias_specs=facility_spec.get('alias_specs', {}),
             # Not strictly needed but we keep them for help() purposes
-            option_schema=schema,
+            config_schema=schema,
             spec=facility_spec
         )
         self.started.facilities[name] = facility
@@ -3318,12 +3327,29 @@ class Stack(object):
         if not self.shared.shared_facility_state.has_key(name):
             created = True
             self.shared.shared_facility_state[name] = obj()
-        facility.shared = self.shared.shared_facility_state[name]
-        if created and hasattr(facility.definition, 'create'):
-            facility.definition.create(facility)
-        if hasattr(facility.definition, 'start'):
-            facility.definition.start(facility)
+        facility.__dict__['shared'] = self.shared.shared_facility_state[name]
+        if created and hasattr(facility.__dict__['definition'], 'create'):
+            facility.warn.deprecated('The start() method is deprecated')
+            facility.__dict__['definition'].create(facility)
+        elif created and hasattr(facility.__dict__['definition'], 'facility_create'):
+            facility.__dict__['definition'].facility_create(facility)
+            # It is possible the getattr is overridden so that local means something else
+            # If local is set in ``create()`` it is an error
+            if facility.__dict__['local'] != None:
+                raise Exception(
+                    "You cannot set the 'local' attribute until after the "
+                    "create() event handler for the %r facility has been "
+                    "run, you should use 'shared' instead"%name
+                )
+        facility.__dict__['local'] = obj()
+        if hasattr(facility.__dict__['definition'], 'start'):
+            facility.warn.deprecated('The start() method is deprecated')
+            facility.__dict__['definition'].start(facility)
+        elif hasattr(facility.__dict__['definition'], 'facility_start'):
+            facility.__dict__['definition'].facility_start(facility)
         self.started.facilities[name] = facility
+        return facility
+        #import pdb; pdb.set_trace()
 
 #config_facility_shared_state = obj()
 #def config_facility_definition_prepare(config, name, filename):
@@ -3338,7 +3364,7 @@ class Stack(object):
 #    prepare=config_facility_definition_prepare
 #)
 
-def flow(shared, run=None, bag=None):
+def flow(shared, run=None, auto_finish=True, auto_raise=True):
     #for name in ensure:
     #    if ensure.count(name)>1:
     #        raise Exception('The facility %r is specified more than once in the ensure argument'%name)
@@ -3353,20 +3379,38 @@ def flow(shared, run=None, bag=None):
     #            raise Exception('Stacks are not allowed to have an attribute named %r'%name)
     if not shared.__class__.__name__ == 'SharedStack':
         raise TypeError('Expected a shared stack object for the \'shared\' argument not %r'%shared)
-    stack = shared.stack(bag=bag)
+    stack = shared.stack()
+    result = None
     #for name in ensure:
     #    stack.start(name)
     try:
         result = run(stack)
     except Exception, e:
-        #log.error(text_traceback())
         if not stack.finished:
             stack.finish(True)
-        raise
-    stack.finish(False)
+        if auto_raise:
+            raise
+    else:
+        if auto_finish:
+            stack.finish(False)
     return result
 
 def find_facilities(package, path):
+    """\
+    Used like this:
+
+    ::
+
+        import os
+
+        facility_specs_by_name = collect_by(
+            'name',
+            find_facilities(
+                '%s.facility'%__package__, 
+                os.path.join(os.path.dirname(__file__), 'facility'),
+            ),
+        )
+    """
     facility_specs = []
     if not os.path.isdir(path):
         path = os.path.dirname(path)
@@ -3394,6 +3438,22 @@ def find_facilities(package, path):
     return facility_specs
 
 def find_commands(package, path):
+    """\
+    Used like this:
+
+    ::
+
+        import os
+
+        command_specs_by_name = collect_by(
+            'name',
+            find_commands(
+                '%s.command'%__package__, 
+                os.path.join(os.path.dirname(__file__), 'command'),
+            ),
+        )
+
+    """
     child_command_specs = []
     if not os.path.isdir(path):
         path = os.path.dirname(path)

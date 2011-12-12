@@ -74,12 +74,12 @@ if [ "$APTCACHE" ]
 then
     echo "Enabling apt caching in the VM ..."
     cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
-	Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };
+	Acquire::http { Proxy \"http://${IP}:3142/ubuntu\"; };
 	EOF
 else
     echo "Disabling apt caching in the VM ..."
     cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
-	// Acquire::http { Proxy \"http://${IP}:9999/ubuntu\"; };
+	// Acquire::http { Proxy \"http://${IP}:3142/ubuntu\"; };
 	EOF
 fi
 echo $IP > /var/lib/buildkit/vmtmp/etc/buildkit_host_ip

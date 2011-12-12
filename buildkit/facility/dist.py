@@ -413,7 +413,7 @@ def copy_package(
             error = ' Failed: Could not copy %r to %r: %s' %(src, dst, e)
     return stacks.obj(error=error, dst=dst)
 
-def deps(
+def package_deps(
     dist, 
     src_dir,
     build_env_dir,
@@ -436,7 +436,7 @@ def deps(
     if not os.path.exists(requires_present):
         present_error='No such file %r'%(requires_present,)
     elif not no_present:
-        result = dist.parse_deps(
+        result = dist.parse_package_deps(
             src_dir=src_dir,
             build_env_dir=build_env_dir,
             deps_rename=deps_rename,
@@ -454,7 +454,7 @@ def deps(
     if not os.path.exists(requires_missing):
         missing_error = 'No such file %r'%(requires_missing,)
     elif not no_missing:
-        result = dist.parse_deps(
+        result = dist.parse_package_deps(
             src_dir=src_dir,
             build_env_dir=build_env_dir,
             deps_rename=deps_rename,
@@ -474,7 +474,7 @@ def deps(
     if not os.path.exists(requires_conflict):
         conflict_error='No such file %r'%(requires_conflict,)
     elif not no_conflict:
-        result = dist.parse_deps(
+        result = dist.parse_package_deps(
             src_dir=src_dir,
             build_env_dir=build_env_dir,
             deps_rename=deps_rename,
@@ -515,7 +515,7 @@ def deps(
         conflict_requirements=conflict_requirements,
     )
 
-def parse_deps(
+def parse_package_deps(
     dist, 
     src_dir, 
     build_env_dir,
@@ -799,7 +799,7 @@ def build_python(
         )
     build_src_dir = os.path.join(build_dir, 'python-%s-%s'%(metadata.package, full_version))
     # At this point we can parse the dependencies
-    calculated_deps = dist.deps(
+    calculated_deps = dist.package_deps(
         src_dir,
         build_env_dir,
         build_src_dir=build_src_dir,
