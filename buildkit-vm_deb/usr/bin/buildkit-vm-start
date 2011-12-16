@@ -66,36 +66,42 @@ echo "Mounting VM to update the DNS settings ..."
 # mount /dev/nbd0p1 /mnt/qemu
 # qemu-nbd --disconnect ${IMAGE}
 
-mount -t ext4 -o loop,offset=512 $IMAGE /var/lib/buildkit/vmtmp
-cp /etc/resolv.conf /var/lib/buildkit/vmtmp/etc/resolv.conf
+if [ ! -d "/var/lib/buildkit/vm/$IMAGE/vmtmp" ]; then
+    echo "Making vmtmp directory ..."
+    sudo -u buildkit mkdir /var/lib/buildkit/vm/$IMAGE/vmtmp
+    echo "done."
+fi
+
+mount -t ext4 -o loop,offset=512 /var/lib/buildkit/vm/$IMAGE/disk.raw /var/lib/buildkit/vm/$IMAGE/vmtmp
+cp /etc/resolv.conf /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/resolv.conf
 
 APTCACHE=`dpkg -l | grep "ii  buildkit-apt-cache"`
 if [ "$APTCACHE" ] 
 then
     echo "Enabling apt caching in the VM ..."
-    cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
+    cat <<- EOF > /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/apt/apt.conf
 	Acquire::http { Proxy \"http://${IP}:3142/ubuntu\"; };
 	EOF
 else
     echo "Disabling apt caching in the VM ..."
-    cat <<- EOF > /var/lib/buildkit/vmtmp/etc/apt/apt.conf
+    cat <<- EOF > /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/apt/apt.conf
 	// Acquire::http { Proxy \"http://${IP}:3142/ubuntu\"; };
 	EOF
 fi
-echo $IP > /var/lib/buildkit/vmtmp/etc/buildkit_host_ip
-COMMAND_OUTPUT=`cat /var/lib/buildkit/vmtmp/etc/hosts | grep "host.buildkit"`
+echo $IP > /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/buildkit_host_ip
+COMMAND_OUTPUT=`cat /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/hosts | grep "host.buildkit"`
 if ! [[ "$COMMAND_OUTPUT" =~ "host.buildkit" ]] ; then
     echo "Adding host.buildkit in VM /etc/hosts  ..."
-    cat << EOF | sudo tee -a /var/lib/buildkit/vmtmp/etc/hosts
+    cat << EOF | sudo tee -a /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/hosts
 $IP host.buildkit
 EOF
 else
     echo "Updating host.buildkit in VM /etc/hosts  ..."
-    sudo sed -e "s,.* host.buildkit,$IP host.buildkit," -i /var/lib/buildkit/vmtmp/etc/hosts
+    sudo sed -e "s,.* host.buildkit,$IP host.buildkit," -i /var/lib/buildkit/vm/$IMAGE/vmtmp/etc/hosts
 fi
 
-umount /var/lib/buildkit/vmtmp
+umount /var/lib/buildkit/vm/$IMAGE/vmtmp
 echo "Starting VM ${IMAGE} on ${TUNNEL} via ${NETWORK_DEVICE} with MAC ${MACADDR}..."
 echo "WARNING: Make sure you correctlty shut down the machine to avoid corruption."
-/usr/bin/kvm -M pc-0.12 -enable-kvm -m ${MEM} -smp ${CPUS} -name dev -monitor pty -boot c -drive file=${IMAGE},if=ide,index=0,boot=on -net nic,macaddr=${MACADDR} -net tap,ifname=${TUNNEL},script=no,downscript=no -serial none -parallel none -usb ${EXTRA}
+/usr/bin/kvm -M pc-0.12 -enable-kvm -m ${MEM} -smp ${CPUS} -name dev -monitor pty -boot c -drive file=/var/lib/buildkit/vm/${IMAGE}/disk.raw,if=ide,index=0,boot=on -net nic,macaddr=${MACADDR} -net tap,ifname=${TUNNEL},script=no,downscript=no -serial none -parallel none -usb ${EXTRA}
 

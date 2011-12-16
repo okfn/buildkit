@@ -191,7 +191,30 @@ you've unmounted it again):
     # Edit /etc/network/interfaces
     # Set a new passwd for the ubuntu user
     # Create a new SSH identity
+    # sudo apt-get install unatteneded-updates
+    # https://help.ubuntu.com/community/AutomaticSecurityUpdates
     sudo umount /var/lib/buildkit/vmtmp
+
+Add an entry to your ``/etc/supervisor/conf.d/buildkit.conf`` file:
+
+::
+
+    TUNNEL=qtap3
+    cat << EOF | sudo tee -a /etc/supervisor/conf.d/buildkit.conf
+
+    [program:${NEWVMNAME}]
+    command=/usr/bin/buildkit-vm-start eth0 $TUNNEL 1024M 4 /var/lib/buildkit/vm/${NEWVMNAME}/disk.raw -nographic
+    user=root
+    numprocs=1
+    stdout_logfile=/var/log/buildkit-vm-${NEWVMNAME}.out.log
+    stderr_logfile=/var/log/buildkit-vm-${NEWVMNAME}.err.log
+    autostart=true
+    autorestart=true
+    startsecs=10
+    EOF
+
+
+(You'll need to restart supervisord but at the moment that doesn't appear too easy).
 
 Now let's start it (change eth1 for your network interface):
 
@@ -214,6 +237,10 @@ Now you can connect from the host to the guest over SSH:
 The  username and password for the VM are both ``ubuntu``. You can also use
 ``sudo -s`` with the password  ``ubuntu`` to get root access. You may want to
 change the password with ``passwd``.
+
+::
+
+    sudo apt-get install -y unattended-upgrades python-software-properties vim-nox screen
 
 
 Example: Building and Testing the CKAN Package Install

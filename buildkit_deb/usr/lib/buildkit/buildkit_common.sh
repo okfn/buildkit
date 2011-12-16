@@ -9,7 +9,7 @@ buildkit_ensure_buildkit_directories () {
         exit 1
     fi
     BASEDIR=$1
-    mkdir -p -m 0750 ${BASEDIR}/{,/vm,/repo,/vmtmp}
+    mkdir -p -m 0750 ${BASEDIR}/{,/vm,/repo}
     mkdir -p -m 0750 /var/log/buildkit/
 
 }

@@ -1,6 +1,12 @@
 Changes
 =======
 
+0.2.3
+-----
+
+* Different ``vmtmp`` directory for each image
+* ``buildkit-vm-start`` now takes the image name, not the disk path
+
 0.2.2
 -----
 
@@ -8,7 +14,7 @@ Changes
 ~~~~~~~~~~
 
 * Changed ``apt-cacher-ng`` to run on port 3142 to avoid a potential conflict
-   with ``supervisor``
+  with ``supervisor``
 
 2011-12-08
 ~~~~~~~~~~
