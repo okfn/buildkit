@@ -528,7 +528,6 @@ There are some gotchas to be aware of with ``buildkit`` so far:
   content. It is therefore best to never have information in ``__init__.py``
   files which is why, for extensions, we now have plugins implemented in
   ``plugin.py`` rather than ``__init__.py``.
-* The ``dist`` facility ``rsync`` command seems to be excluding too much
 * Packaging sometimes strips our key directories, such as any named ``dist``,
   they just won't be present in the packaged version.
 

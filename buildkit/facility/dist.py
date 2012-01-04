@@ -123,7 +123,7 @@ def prepare_build_dir(
         raise Exception('No such package directory %r in %r, is your package name correct?'%(package.split('.')[0], src_dir))
     cmd = ("""
         mkdir %(build_dir)s/%(package)s-%(full_version)s/
-        rsync -aHxv --progress --exclude=*.swp --exclude=*.pyc --exclude=build --exclude=dist --exclude=.git --exclude=.gitignore --exclude=.hg --exclude=.hgtags --exclude=.hgignore --numeric-ids %(exclude)s ./ %(build_dir)s/%(package)s-%(full_version)s/
+        rsync -aHxv --progress --exclude=*.swp --exclude=*.pyc --exclude=/build --exclude=/dist --exclude=.git --exclude=.gitignore --exclude=.hg --exclude=.hgtags --exclude=.hgignore --numeric-ids %(exclude)s ./ %(build_dir)s/%(package)s-%(full_version)s/
         ls %(build_dir)s/%(package)s-%(full_version)s/
         cd %(build_dir)s
         tar -cvzf %(build_dir)s/%(package)s-%(full_version)s.tar.gz %(package)s-%(full_version)s

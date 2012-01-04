@@ -1283,7 +1283,7 @@ def validate(data, schema, context=None):
 def convert_one(value, converter, context=None):
     result = {None: value}
     errors = {None: []}
-    convert(converter, None, result, error, context)
+    convert(converter, None, result, errors, context)
     if errors[None]:
         raise Exception(errors[None])
     else:
@@ -1661,6 +1661,8 @@ help_template = """\
 
 %(opts)s
 
+%(child_commands)s
+
 %(tip)s"""
 
 main_help_template = """\
@@ -1724,37 +1726,41 @@ def assemble_help(
         usage += ' [ARGS]'
     if child_command_specs:
         usage += ' COMMAND [ARGS] [OPTIONS]'
+    program = command.program
+    if command.parent:
+        parents_list = []
+        c = command
+        while c.parent:
+            c = c.parent
+            parents_list.insert(0, c.name)
+        parents = ' '.join(parents_list[1:])
+        if parents.strip():
+            parents = ' '+parents.strip()
+        program = '%s%s'%(command.parent.program, parents)
+    tip = ''
     if child_command_specs:
-        tip = (
-            '\nType `%(program)s COMMAND --help\' '
-            'for help on individual commands.'
+        tip += (
+            '\nType `%(program)s %(command)s COMMAND --help\' '
+            'for help on individual commands.\n'
         ) % {
-           'program': command.program,
+           'program': program,
+           'command': command.name,
         }
     else:
-        tip = ''
-        if command.parent:
-            parents_list = []
-            c = command
-            while c.parent:
-                c = c.parent
-                parents_list.insert(0, c.name)
-            parents = ' '.join(parents_list[1:])
-            if parents.strip():
-                parents = ' '+parents.strip()
-            tip = (
-                '\nType `%(program)s --help\' for '
-                'parent command options, arguments and other commands.'
-            ) % {
-               'program': '%s%s'%(command.parent.program, parents),
-            }
+        tip += (
+            '\nType `%(program)s --help\' for '
+            'parent command options, arguments and other commands.\n'
+        ) % {
+           'program': program, 
+        }
+    tip = tip.strip()
     variables = dict(
         summary = summary,
         usage = usage,
         opts = help_opt_specs(command),
         args = help_arg_specs(command),
         child_commands = help_child_command_specs(child_command_specs),
-        program = command.program,
+        program = program,
         tip = tip,
     )
     if command.parent:
@@ -2218,11 +2224,6 @@ def parse_argv(
                     value_to_set = value
                     if not opt_spec.get('metavar', ''):
                         value_to_set = True
-                    elif opt_spec.get('converter'):
-                        value_to_set = convert_one(
-                            value_to_set,
-                            opt_spec.get('converter')
-                        )
                     if multiple:
                         internal_opts[opt_spec.name].append(value_to_set)
                     else:
@@ -2276,10 +2277,21 @@ def parse_argv(
             )
         else:
             arg_error = 'Unexpected argument %s'%(remaining_args[0])
+    # Apply any converters
+    schema = ordered_obj()
+    for opt_spec in opt_specs:
+        if opt_spec.get('converter'):
+            schema[opt_spec.name] = opt_spec['converter']
+        else:
+            schema[opt_spec.name] = []
+    result, errors = validate(internal_opts, schema)#, context=obj(cmd=cmd))
+    if errors:
+        raise Exception(format_errors(errors, name='opts'))
     result = obj(
         getopt = getopt_result,
         arg_error = arg_error,
-        opts=internal_opts,
+        opts=result,
+        internal_opts=internal_opts,
         flags=flags_used,
         values=values_used,
         position=position,
@@ -2596,6 +2608,7 @@ class Log(object):
         wrap_width=default_wrap_width,
         tabwidth=2,
     ):
+        self.name = name
         self.handler = logging.getLogger(name)
         self.wrap_width = wrap_width
         self.tabwidth = tabwidth
@@ -2610,7 +2623,7 @@ class Log(object):
 
     def _log(self, level, string):
         if self.prepend:
-            message = '[%s] %s'%(self.prepend, string)
+            message = '(%s) [%-13s] %s'%(self.prepend, self.name, string)
         else:
             message = string
         self.handler.log(level, message)
@@ -2858,6 +2871,7 @@ run_schema.update({
     'out':           [missing_if_value_in([None]), default(print_fn)],
     'err':           [missing_if_value_in([None]), default(print_fn)],
     'help_opt_name': [missing_if_value_in([None]), default('help')],
+    'program':       [missing_if_value_in([None])],
 })
 
 class SharedStack(object):
@@ -2868,7 +2882,7 @@ class SharedStack(object):
     ):
         self.facility_specs=[]
         for facility_spec in facility_specs or []:
-            result, error = validate(facility_spec, facility_specs_schema)
+            result, error = validate(facility_spec, facility_specs_schema, context=obj(shared=self))
             if error:
                 raise Exception(format_errors(error, name='facility_spec'))
             self.facility_specs.append(result)
@@ -2973,7 +2987,7 @@ class Facility(object):
         # Set up the actions
         self.actions = dict()
         for name, action in self.__dict__['definition'].items():
-            if action and (not name.startswith('facility_') or name.startswith('_')) and inspect.isfunction(action):
+            if (not name.startswith('facility_') or name.startswith('_')) and inspect.isfunction(action):
                 a = [action]
                 args, varargs, keywords, defaults = inspect.getargspec(action)
                 if args and (\
@@ -3289,7 +3303,7 @@ class Stack(object):
                 option = {}
             # Let's set up the config
             schema = obj(getattr(facility_spec.definition, 'facility_config_schema', {}))
-            result, error = validate(option, schema)
+            result, error = validate(option, schema, context=obj(stack=self))
             if error:
                 raise Exception('Error parsing config file. %s'%format_errors(error, "option['"+name+"']"))
             self.shared.config[name] = result
@@ -3328,10 +3342,10 @@ class Stack(object):
             created = True
             self.shared.shared_facility_state[name] = obj()
         facility.__dict__['shared'] = self.shared.shared_facility_state[name]
-        if created and hasattr(facility.__dict__['definition'], 'create'):
-            facility.warn.deprecated('The start() method is deprecated')
-            facility.__dict__['definition'].create(facility)
-        elif created and hasattr(facility.__dict__['definition'], 'facility_create'):
+        #if created and hasattr(facility.__dict__['definition'], 'create'):
+        #    facility.warn.deprecated('The start() method is deprecated')
+        #    facility.__dict__['definition'].create(facility)
+        if created and hasattr(facility.__dict__['definition'], 'facility_create'):
             facility.__dict__['definition'].facility_create(facility)
             # It is possible the getattr is overridden so that local means something else
             # If local is set in ``create()`` it is an error
@@ -3482,6 +3496,7 @@ def find_commands(package, path):
 
 def run(
     child_command_specs=None,
+    program=None,
     argv=None,
     definition=None,
     name=None,
@@ -3510,6 +3525,7 @@ def run(
     """
     data = {
         "name": name,
+        "program": program,
         "definition": definition,
         "child_command_specs": child_command_specs or [],
         # Facility specs get validated later
@@ -4144,6 +4160,11 @@ def parse_config(filename, encoding='utf8', by_facility=True):
 
     Note: The implementation doesn't enforce all the option naming conventions
     yet
+
+    Also, if your config option is a path you can use ``->`` instead of ``=``.
+    When the config file is parsed, the value will be treated as a path relative to
+    the directory containing the config file and will be adjusted so that the
+    option is correct, relative to where the application is being run from.
     """
     if not os.path.exists(filename):
         raise Exception('No such file %r'%filename)
@@ -4208,10 +4229,18 @@ def parse_config_string(data, filename=None, encoding='utf8'):
              # It is the start of an option
              parts = line.split(' = ')
              if len(parts) == 1:
-                 error = "Expected the characters ' = ' on line %s"
-                 if '=' in line:
-                     error += ", not just an '=' on its own"
-                 raise SyntaxError(error%(i+1))
+                 parts = line.split(' -> ')
+                 if len(parts) == 1:
+                     error = "Expected the characters ' = ' or ' -> ' on line %s"
+                     raise SyntaxError(error%(i+1))
+                 elif len(parts) > 2:
+                     value = ' -> '.join(parts[1:])
+                 else:
+                     value = parts[1]
+                 if filename is None:
+                     raise Exception('No config file path specified, so cannot use -> syntax on line %s, please use absolute paths'%i+1)
+                 # Adjust the value
+                 value = relpath(os.path.join(os.path.dirname(filename), value), os.getcwd())
              elif len(parts) > 2:
                  value = ' = '.join(parts[1:])
              else:
