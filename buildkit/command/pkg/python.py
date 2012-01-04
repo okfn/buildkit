@@ -217,7 +217,7 @@ def build_python(cmd, opts, results):
                 'distro_depends',
                 'package',
                 'version',
-                'packaging_version',
+                #'packaging_version',
                 'url',
                 'description',
                 'exclude',

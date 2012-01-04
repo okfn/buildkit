@@ -11,9 +11,9 @@ arg_specs = [
         help_msg='The directory name of the repository',
     ),
     dict(
-        metavar='PACKAGE_NAMES', 
-        help_msg='Names of the packages to remove',
-        min=1,
+        metavar='PACKAGE_NAME', 
+        help_msg='Name of one or more packages to remove (without their version numbers, file extensions or anything else) for example: python-buildkit rsync etc. Not needed if --all is used',
+        min=0,
     ),
 ]
 opt_specs_by_name = dict(
@@ -48,6 +48,9 @@ def run(cmd):
                 name, version = name.strip().split(' ')
                 if name not in package_names:
                     package_names.append(name)
+    if not package_names:
+        cmd.err('ERROR: No packages to remove')
+        return 1
     cmd_ = 'reprepro --gnupghome "%s" remove lucid %s' % (cmd.parent.opts.key_dir, ' '.join(package_names))
     cmd.out(cmd_)
     result = stacks.process(

@@ -1,5 +1,25 @@
 """\
 Install a GNUPG key for signing of packages in a repository
+
+Used like this:
+
+::
+
+    sudo rm -r /var/lib/buildkit/key
+    sudo rm -r /var/lib/buildkit/repo/packages_public.key
+    sudo buildkit repo installkey --email=name@example.com --name="Example Name" --comment="Example comment"
+
+You can then see the result:
+
+::
+
+    okfn@coi-ckan-build:~/new/ckan$ sudo -u buildkit gpg --list-secret-keys --homedir /var/lib/buildkit/key
+    /var/lib/buildkit/key/secring.gpg
+    ---------------------------------
+    sec   1024D/D8D8C238 2012-01-04
+    uid                  Example Name (Example comment) <name@example.com>
+    ssb   1024g/06DBEDB2 2012-01-04
+    
 """
 
 #import uuid
@@ -48,7 +68,7 @@ def run(cmd):
             'packages may have already been signed with the existing one'
         )
         return 1
-    cmd_ = '. /usr/lib/buildkit/buildkit_common.sh\nbuildkit_ensure_public_key "%s" "%s" "%s" "%s" "%s"\nexit'%(
+    cmd_ = '. /usr/lib/buildkit/buildkit_common.sh\nbuildkit_ensure_public_key "%s" "%s" "%s" "%s" "%s"\nchown -R buildkit:buildkit /var/lib/buildkit/key\nchown buildkit:www-data /var/lib/buildkit/repo/packages_public.key\nexit'%(
         cmd.opts.name,
         cmd.opts.email,
         cmd.opts.comment,
