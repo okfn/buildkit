@@ -60,32 +60,34 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
         base_name=base_name,
         arch=arch,
     )
-    cmd_ = """
-    vmbuilder kvm ubuntu \
-        --mem 512 \
-        --cpus 1 \
-        --domain %(base_name)s%(vm_ip_part)s \
-        --dest %(base_name)s%(vm_ip_part)s \
-        --flavour virtual \
-        --suite lucid \
-        --arch %(arch)s \
-        --hostname %(base_name)s%(vm_ip_part)s \
-        --user ubuntu \
-        --pass ubuntu \
-        --rootpass ubuntu \
-        --debug -v \
-        --ip %(base_ip)s.%(vm_ip_part)s \
-        --mask 255.255.255.0 \
-        --net %(base_ip)s.0 \
-        --bcast %(base_ip)s.255 \
-        --gw %(base_ip)s.254 \
-        --dns %(base_ip)s.254 \
-        --proxy http://%(proxy_ip)s:3142/ubuntu \
-        --components main,universe \
-        --addpkg openssh-server
-    """%args
+    cmd_ = [
+        'vmbuilder', 'kvm', 'ubuntu',
+        '--mem', '512',
+        '--cpus', '1',
+        '--domain', '%(base_name)s%(vm_ip_part)s'%args,
+        '--dest', '%(base_name)s%(vm_ip_part)s'%args,
+        '--flavour', 'virtual',
+        '--suite', 'lucid',
+        '--arch', '%(arch)s'%args,
+        '--hostname', '%(base_name)s%(vm_ip_part)s'%args,
+        '--user', 'ubuntu',
+        '--pass', 'ubuntu',
+        '--rootpass', 'ubuntu'
+        '--debug', '-v',
+        '--ip', '%(base_ip)s.%(vm_ip_part)s'%args,
+        '--mask', '255.255.255.0',
+        '--net', '%(base_ip)s.0'%args,
+        '--bcast', '%(base_ip)s.255'%args,
+        '--gw', '%(base_ip)s.254'%args,
+        '--dns', '%(base_ip)s.254'%args,
+        '--proxy', 'http://%(proxy_ip)s:3142/ubuntu'%args,
+        '--components', 'main,universe',
+        '--addpkg', 'openssh-server',
+        '--addpkg', 'acpid',
+    ]
     for package in packages:
-        cmd_ += '--addpkg '+package
+        cmd_.append('--addpkg ')
+        cmd_.append(package)
     cmd.out(cmd_)
     result = stacks.process(
         cmd_,

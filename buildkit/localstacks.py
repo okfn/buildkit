@@ -1873,10 +1873,10 @@ def format_string(string, *args, **opts):
         return string + end
 
 def print_fn(string, *args, **opts):
-    print format_string(string, *args, **opts),
+    sys.stdout.write(format_string(string, *args, **opts))
 
 def print_err_fn(string, *args, **opts):
-    print >> sys.stderr, format_string(string, *args, **opts),
+    sys.stderr.write(format_string(string, *args, **opts))
 
 class Command(object):
     def __init__(
@@ -2003,19 +2003,19 @@ def valid_options(key, data, errors, context):
                 "'-' or '--' characters, not %r"%(opt, char)
             )
 
-def ensure_no_default_or_converter_if_missing(key, data, errors, context):
-    if data[key] == missing:
-        for disallowed in ['default', 'converter']:
-            other_key = sibling_key(key, disallowed)
-            if data[other_key] != missing:
-                raise Exception(
-                    'You cannot specify a %r value for option %r unless a '
-                    'metavar is specified too, otherwise the option doesn\'t '
-                    'take a value'%(
-                        disallowed,
-                        data[sibling_key(key, 'name')],
-                    )
-                )
+#def ensure_no_default_or_converter_if_missing(key, data, errors, context):
+#    if data[key] == missing:
+#        for disallowed in ['default', 'converter']:
+#            other_key = sibling_key(key, disallowed)
+#            if data[other_key] != missing:
+#                raise Exception(
+#                    'You cannot specify a %r value for option %r unless a '
+#                    'metavar is specified too, otherwise the option doesn\'t '
+#                    'take a value'%(
+#                        disallowed,
+#                        data[sibling_key(key, 'name')],
+#                    )
+#                )
 
 def parse_argv(
     arg_specs,
@@ -2794,7 +2794,8 @@ opt_specs_schema = obj({
     'help_msg': [not_missing()],
     'default': [],
     'converter': [],
-    'metavar': [ensure_no_default_or_converter_if_missing, stop_if_missing, uppercase_alpha],
+    'metavar': [stop_if_missing, uppercase_alpha],
+    #'metavar': [ensure_no_default_or_converter_if_missing, stop_if_missing, uppercase_alpha],
     'multiple': [default(False), instance_of(bool)],
     extra_keys: [not_present],
 })
@@ -4003,38 +4004,48 @@ def process(
     cmd,
     out=None,
     err=None,
+    print_out=None,
+    print_err=None,
     in_data=None,
     merge=False,
     echo=False,
+    wait_for_retcode=True,
     **popen_args
 ):
     """\
     For most cases ``in_data`` should end with a \n.
     """
+    if echo:
+        print_out = print_fn
+        print_err = print_err_fn
+    if merge:
+        print_err = print_fn 
+    exit = []
+    retcode = None
     out_data = StringIO.StringIO()
     err_data = StringIO.StringIO()
     if out is None:
-        def out(fh, stdin, output):
+        def out(fh, stdin, output, exit):
             while True:
                 line = fh.readline()
                 if not line:
                     break
-                if echo:
-                    print line,
                 output.write(line)
+                if print_out:
+                    print_out(line)
     elif merge:
         raise Exception("The 'merge' option doesn't work with a custom 'out' function")
     elif echo:
         raise Exception("The 'echo' option doesn't work with a custom 'out' function")
     if err is None:
-        def err(fh, stdin, output):
+        def err(fh, stdin, output, exit):
             while True:
                 line = fh.readline()
                 if not line:
                     break
-                if echo:
-                    print line,
                 output.write(line)
+                if print_err:
+                    print_err(line)
     elif merge:
         raise Exception("The 'merge' option doesn't work with a custom 'err' function")
     elif echo:
@@ -4048,28 +4059,49 @@ def process(
     )
     stdout_thread = threading.Thread(
         target=out,
-        args=(process.stdout, process.stdin, out_data)
+        args=(process.stdout, process.stdin, out_data, exit)
     )
     stdout_thread.setDaemon(True)
     stdout_thread.start()
     stderr_thread = threading.Thread(
         target=err,
-        args=(process.stderr, process.stdin, merge and out_data or err_data)
+        args=(process.stderr, process.stdin, merge and out_data or err_data, exit),
+    )
+    stderr_thread.setDaemon(True)
+    stderr_thread.start()
+    stderr_thread = threading.Thread(
+        target=err,
+        args=(process.stderr, process.stdin, merge and out_data or err_data, exit),
     )
     stderr_thread.setDaemon(True)
     stderr_thread.start()
     if in_data is not None:
         process.stdin.write(in_data)
-    retcode = process.wait()
-    stdout_thread.join()
-    stderr_thread.join()
+    if wait_for_retcode:
+        retcode = process.wait()
+        stdout_thread.join()
+        stderr_thread.join()
+    else:
+        def can_finish(stdout_thread, stderr_thread, exit):
+            while not exit:
+                pass
+            stdout_thread.join()
+            stderr_thread.join()
+        finish_thread = threading.Thread(
+            target=can_finish,
+            args=(stdout_thread, stderr_thread, exit),
+        )
+        finish_thread.setDaemon(True)
+        finish_thread.start()
+        finish_thread.join()
+        retcode = exit[0]
     result = obj(
         stdout=out_data.getvalue(),
         stderr=err_data.getvalue(),
         retcode=retcode,
+        pid=process.pid,
     )
     return result
-
 
 import unicodedata
 import string

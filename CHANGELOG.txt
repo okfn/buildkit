@@ -4,8 +4,10 @@ Changes
 0.2.3
 -----
 
+* Completely re-worked ``vm`` command with ``start``, ``stop``, ``status``,
+  ``clone``, ``mount`` and ``umount`` sub-command
 * Different ``vmtmp`` directory for each image
-* ``buildkit-vm-start`` now takes the image name, not the disk path
+* Fixed a bug with ``repo remove``
 
 0.2.2
 -----

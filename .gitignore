@@ -16,7 +16,12 @@ build/
 dist/
 data/
 doc/build/
-buildkit_deb/DEBIAN/control
+buildkit*_deb/DEBIAN/control
+buildkit*_deb/DEBIAN/changelog
+buildkit*_deb/DEBIAN/compat
+buildkit*_deb/DEBIAN/copyright
+buildkit*_deb/DEBIAN/docs
+buildkit*_deb/DEBIAN/rules
 distribute-0.6.10.tar.gz
 test/generate_package/
 test/non_python_package/

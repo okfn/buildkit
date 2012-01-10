@@ -5,5 +5,5 @@ Homepage: http://jimmyg.org/
 Package: buildkit-vm
 Version: 0.2.0+01+lucid
 Architecture: all
-Depends: buildkit, ubuntu-vm-builder, python-vm-builder, kvm, kvm-pxe, uml-utilities, supervisor
+Depends: buildkit, ubuntu-vm-builder, python-vm-builder, kvm, kvm-pxe, uml-utilities, supervisor, bridge-utils, screen, socat, rsync
 Description: Cloud infrastructure and .deb file management software
