@@ -133,8 +133,14 @@ def get_vm_info():
             continue
         parts = [part for part in line.strip().split(' ') if part]
         pid = parts[0]
-        image_arg = parts[18].split('=')[1].split(',')[0].split('/')[-2]
-        net_arg = parts[22].split(',')[1].split('=')[1]
+        try:
+            image_arg = parts[18].split('=')[1].split(',')[0].split('/')[-2]
+        except:
+            image_arg = 'ERROR'
+        try:
+            net_arg = parts[22].split(',')[1].split('=')[1]
+        except:
+            net_arg = 'ERROR'
         instance = stacks.obj(
             pid = pid,
             image = image_arg,
@@ -232,7 +238,7 @@ case "$1" in
 
     if [ -e "/etc/buildkit_on_start.sh" ] ; then
         echo "Running custom buildkit on start script ..."
-        . /etc/buildkit_on_start.sh
+        bash /etc/buildkit_on_start.sh
         echo "done."
     fi
     ;;
@@ -343,6 +349,31 @@ def parse_file_and_dir_specs(value):
         result.append(stacks.obj(src=src, dst=dst))
     return result
 
+def parse_dir_specs(value):
+    specs = parse_file_and_dir_specs(value)
+    for spec in specs:
+        if not os.path.isdir(spec.src):
+            raise Exception('Path %r is not a directory'%spec.src)
+        #if spec.dest.endswith('/'):
+        #    spec.dest = os.path.join(
+        #        spec.dest,
+        #        spec.src.split('/')[-1]
+        #    )
+    return specs
+
+def parse_file_specs(value):
+    specs = parse_file_and_dir_specs(value)
+    for spec in specs:
+        if not os.path.isfile(spec.src):
+            raise Exception('Path %r is not a file'%spec.src)
+        if spec.dst.endswith('/'):
+            spec.dst = os.path.join(
+                spec.dest,
+                spec.src.split('/')[-1]
+            )
+    return specs
+
+
 #
 # Command
 #
@@ -390,19 +421,19 @@ opt_specs_by_name = dict(
         metavar='NAME',
         #converter=[gen_tunnel_if_missing],   
     ),
-    #copy_dir = dict(
-    #    flags=['-d', '--copy-dir'],
-    #    help_msg='Copy a directory into the VM before it boots, removing the directory if it already exists. DIR_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character.',
-    #    metavar='DIR_SPEC',
-    #    multiple=True,
-    #    converter=[parse_file_and_dir_specs],
-    #),
+    copy_dir = dict(
+        flags=['-d', '--copy-dir'],
+        help_msg='Copy a directory into the VM before it boots, removing the directory if it already exists. DIR_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character.',
+        metavar='DIR_SPEC',
+        multiple=True,
+        converter=[parse_dir_specs],
+    ),
     copy_file = dict(
         flags=['-f', '--copy-file'],
-        help_msg='Copy a file into the VM before it boots. FILE_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character.',
+        help_msg='Copy a file into the VM before it boots. FILE_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character. NOTE: /tmp directories are sometimes cleared during the boot process so you are best off copying files to other directories if you want them to be available at the end of the boot process.',
         metavar='FILE_SPEC',
         multiple=True,
-        converter=[parse_file_and_dir_specs],
+        converter=[parse_file_specs],
     ),
     mac_address = dict(
         flags=['-m', '--mac-address'],

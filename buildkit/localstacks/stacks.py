@@ -1863,6 +1863,10 @@ def get_missing_definitions(key, data, errors, context):
             data[looking_for] = import_and_return(data[key])
 
 def format_string(string, *args, **opts):
+    if isinstance(string, str):
+        string = string.decode('utf8')
+    elif not isinstance(string, unicode):
+        string = unicode(string)
     if opts.get('end') is None:
         end = '\n'
     else:
@@ -1873,10 +1877,10 @@ def format_string(string, *args, **opts):
         return string + end
 
 def print_fn(string, *args, **opts):
-    sys.stdout.write(format_string(string, *args, **opts))
+    sys.stdout.write(format_string(string, *args, **opts).encode('utf8'))
 
 def print_err_fn(string, *args, **opts):
-    sys.stderr.write(format_string(string, *args, **opts))
+    sys.stderr.write(format_string(string, *args, **opts).encode('utf8'))
 
 class Command(object):
     def __init__(
@@ -4010,11 +4014,16 @@ def process(
     merge=False,
     echo=False,
     wait_for_retcode=True,
+    shell=False,
     **popen_args
 ):
     """\
     For most cases ``in_data`` should end with a \n.
     """
+    if shell and isinstance(cmd, (list, tuple)):
+        raise Exception('The command should be a string if shell=True')
+    if not shell and not isinstance(cmd, (list, tuple)):
+        raise Exception('The command should be a list if shell=False')
     if echo:
         print_out = print_fn
         print_err = print_err_fn
@@ -4055,6 +4064,7 @@ def process(
         stdin=subprocess.PIPE, 
         stdout=subprocess.PIPE, 
         stderr=subprocess.PIPE,
+        shell=shell,
         **popen_args
     )
     stdout_thread = threading.Thread(

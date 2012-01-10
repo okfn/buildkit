@@ -86,12 +86,11 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
         '--addpkg', 'acpid',
     ]
     for package in packages:
-        cmd_.append('--addpkg ')
+        cmd_.append('--addpkg')
         cmd_.append(package)
     cmd.out(cmd_)
     result = stacks.process(
         cmd_,
-        shell=True, 
         cwd=output_dir,
         merge=True,
         echo=True,
@@ -121,6 +120,9 @@ def build(cmd, vm_ip_part, base_ip, arch, output_dir, proxy_ip=None, packages=No
     return result
 
 def run(cmd):
+    if os.geteuid() != 0:
+        cmd.err("This script must be run as root")
+        return 1
     if not os.path.exists(cmd.opts.output_dir):
         os.mkdir(cmd.opts.output_dir)
     if cmd.opts.proxy_ip is None:

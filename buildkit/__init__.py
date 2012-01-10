@@ -1,4 +1,8 @@
 try:
     import stacks
-except ImportError:
-    import localstacks as stacks
+except:
+    import os
+    import sys
+    localstacks_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), 'localstacks'))
+    sys.path.append(localstacks_dir)
+    import stacks
