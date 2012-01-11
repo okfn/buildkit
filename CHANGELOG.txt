@@ -5,7 +5,7 @@ Changes
 -----
 
 * Completely re-worked ``vm`` command with ``start``, ``stop``, ``status``,
-  ``clone``, ``mount`` and ``umount`` sub-command
+  ``clone``, ``console``, ``mount`` and ``umount`` sub-commands
 * Different ``vmtmp`` directory for each image
 * Fixed a bug with ``repo remove``
 

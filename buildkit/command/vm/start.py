@@ -7,33 +7,6 @@ eg:
 
 """
 
-#  To get dmesg output on boot:
-#
-#  cat << EOF | sudo tee /boot/grub/menu.lst
-#  title           Ubuntu 10.04.3 LTS, kernel 2.6.32-33-server
-#  uuid            cebcbb77-a2bf-4bb8-b1b3-1323f27ac7a4
-#  -1323f27ac7a4 ro console=ttyS0,115200n8 console=tty0
-#  initrd          /boot/initrd.img-2.6.32-33-server
-#  
-#  title           Ubuntu 10.04.3 LTS, kernel 2.6.32-33-server (recovery mode)
-#  uuid            cebcbb77-a2bf-4bb8-b1b3-1323f27ac7a4
-#  -1323f27ac7a4 ro  single
-#  initrd          /boot/initrd.img-2.6.32-33-server
-#  EOF
-#
-#  Something like this might work too:
-#  
-#  cat << EOF | sudo tee /etc/default/grub 
-#  GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 console=tty0"
-#  EOF
-#  
-#  sudo update-grub
-# 
-#  For shutdown support:
-# 
-#  sudo aptitude install acpid acpi-support
-
-
 import os
 import socket
 import stacks
@@ -72,7 +45,7 @@ def determine_ip():
         shell=True
     )
     exception = Exception('Could not determine the IP address, is the host connected to the internet? If so, please --ip option to specify the IP address manually')
-    if result.retcode:
+    if result.retcode or result.stderr:
         raise exception
     ip = result.stdout.strip().split('\n')[0]
     if not valid_ip(ip):
@@ -84,7 +57,7 @@ def gen_mac():
         r"dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/'",
         shell=True,
     )
-    if result.retcode:
+    if result.retcode or result.stderr:
         raise Exception('Could not generate a mac address automatically, please use the --mac-address option')
     mac = '52:54:'+result.stdout.strip()
     return mac
@@ -94,7 +67,7 @@ def determine_interface(ip):
         "/sbin/ifconfig | grep -B 1 '%s' | grep -v '%s' | awk '{ print $1}'"%(ip, ip),
         shell=True,
     )
-    if result.retcode:
+    if result.retcode or result.stderr:
         raise Exception('Could not determine the interface automatically, please use the --interface option')
     interface = result.stdout.strip()
     return interface
@@ -179,7 +152,7 @@ def create_bridge(interface, bridge_name, add=False):
         cmd += '\nbrctl addbr %s'%bridge_name
     cmd += '\nifconfig %s 192.168.100.254 netmask 255.255.255.0 up'%bridge_name
     cmd += '\necho "1" > /proc/sys/net/ipv4/ip_forward'
-    result = stacks.process(cmd, shell=True, echo=True)
+    result = stacks.process(cmd, shell=True, echo=True, merge=True)
     return result
 
 def create_tunnel(tunnel):
@@ -188,7 +161,7 @@ modprobe tun
 tunctl -b -u root -t %(tunnel)s
 brctl addif br0 %(tunnel)s
 ifconfig %(tunnel)s up 0.0.0.0 promisc'''%dict(tunnel=tunnel)
-    result = stacks.process(cmd, shell=True, echo=True)
+    result = stacks.process(cmd, shell=True, echo=True, merge=True)
     return result
 
 def buildkit_apt_cache_installed():
@@ -241,6 +214,7 @@ case "$1" in
         bash /etc/buildkit_on_start.sh
         echo "done."
     fi
+    echo "Buildkit exec_on_boot_completed"
     ;;
   stop)
     ;;
@@ -276,6 +250,26 @@ respawn
 exec /sbin/getty -L 38400 ttyS0 vt102
 ''')
     fp.close()
+    fp = open(os.path.join(path, 'boot/grub/menu.lst'), 'r')
+    data = fp.read()
+    fp.close()
+    if "quiet splash" in data:
+        data = data.replace("quiet splash", "console=ttyS0,115200n8 console=tty0")
+        fp = open(os.path.join(path, 'boot/grub/menu.lst'), 'w')
+        fp.write(data)
+        fp.close()
+        # Now we need to enter a chroot and update the image
+        result = stacks.process(
+            [
+                'chroot',
+                path,
+                'update-grub',
+            ],
+            echo=True,
+            merge=True,
+        )
+        if result.retcode:
+            raise Exception('Could not mount the image %s. %s\n'%(image, result.stderr))
 
 def mount_image(image, path):
     if not os.path.exists(path):
@@ -287,6 +281,7 @@ def mount_image(image, path):
     if files:
         if len(files) > 1:
             # Must be mounted
+            raise Exception('The VM already appears to be mounted at %r'%path)
             umount_image(path)
         elif len(files) > 0 and files[0] == 'vm.info':
             os.remove(os.path.join(path, 'vm.info'))
@@ -305,7 +300,7 @@ def umount_image(path):
         shell=True,
     )
     if result.retcode:
-        raise Exception('Could not unmount the image %s. %s\n'%(image, result.stderr))
+        raise Exception('Could not unmount the path %s. %s\n'%(path, result.stderr))
 
 
 #
@@ -421,13 +416,13 @@ opt_specs_by_name = dict(
         metavar='NAME',
         #converter=[gen_tunnel_if_missing],   
     ),
-    copy_dir = dict(
-        flags=['-d', '--copy-dir'],
-        help_msg='Copy a directory into the VM before it boots, removing the directory if it already exists. DIR_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character.',
-        metavar='DIR_SPEC',
-        multiple=True,
-        converter=[parse_dir_specs],
-    ),
+    #copy_dir = dict(
+    #    flags=['-d', '--copy-dir'],
+    #    help_msg='Copy a directory into the VM before it boots, removing the directory if it already exists. DIR_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character.',
+    #    metavar='DIR_SPEC',
+    #    multiple=True,
+    #    converter=[parse_dir_specs],
+    #),
     copy_file = dict(
         flags=['-f', '--copy-file'],
         help_msg='Copy a file into the VM before it boots. FILE_SPEC should be in the format \'SRC -> DST\' where SRC is the source path to the file and DST is the full destination path on the VM drive, begining with a / character. NOTE: /tmp directories are sometimes cleared during the boot process so you are best off copying files to other directories if you want them to be available at the end of the boot process.',
@@ -448,21 +443,27 @@ opt_specs_by_name = dict(
     ),
     exec_on_boot = dict(
         flags=['-e', '--exec-on-boot'],
-        help_msg='A set of bash commands to be exectued at the end of the boot process, after files and directories have been copied',
+        help_msg='A set of bash commands to be exectued at the end of the boot process, after files and directories have been copied. If you are using bash you\'ll need to be careful about escaping, here\'s a correct example with newlines: --exec-on-boot=$\'echo 1\\nsleep 2\\necho 2\'',
         metavar='COMMANDS',
     ),
-    #wait_for_boot = dict(
-    #    flags=['--wait-for-boot'],
-    #    help_msg='Don\'t exit until the system is booted and the login prompt is displayed',
-    #),
+    dont_wait = dict(
+        flags=['--dont-wait'],
+        help_msg='Return immediately, don\'t wait for the VM\'s wait message. See also --wait-message.',
+    ),
+    wait_message = dict(
+        metavar='MESSAGE',
+        flags=['--wait-message'],
+        help_msg='The message we wait for if --wait is specified. Defaults to the string output when the buildkit service finishes starting (this is usually the last service started)',
+        default='Buildkit exec_on_boot_completed',
+    ),
     graphics = dict(
         flags=['--graphics'],
         help_msg='Also load a window for the VM. Note: If you do this, the start command won\'t return until the window is closed when the VM exits.',
     ),
-    #console = dict(
-    #    flags=['--console'],
-    #    help_msg='Drop the user into a login prompt after boot',
-    #),
+    no_console = dict(
+        flags=['--no-console'],
+        help_msg='Don\'t show boot output during start up',
+    ),
 )
 
 def run(cmd):
@@ -510,24 +511,48 @@ def run(cmd):
     mount_image("/var/lib/buildkit/vm/%s/disk.raw"%cmd.args[0], path)
     update_image(cmd.args[0], cmd.opts.ip, use_apt_proxy=cmd.opts.use_apt_proxy)
     for spec in cmd.opts.copy_file:
+        cmd.out('Copying %r to %r ...', spec.src, os.path.join(path, spec.dst[1:]))
         shutil.copy2(spec.src, os.path.join(path, spec.dst[1:]))
+        cmd.out('done.')
+    fp = open(os.path.join(path, 'etc/buildkit_on_start.sh'), 'w')
+    fp.write('#!/bin/sh\n\n')
     if cmd.opts.exec_on_boot:
-        fp = open(os.path.join(path, 'etc/buildkit_on_start.sh'), 'w')
-        fp.write('#!/bin/sh\n\n')
         fp.write(cmd.opts.exec_on_boot)
-        fp.close()
-        os.chmod(os.path.join(path, 'etc/buildkit_on_start.sh'), stat.S_IEXEC)
+    fp.close()
+    os.chmod(os.path.join(path, 'etc/buildkit_on_start.sh'), stat.S_IEXEC)
     umount_image(path)
     opts = cmd.opts.copy()
     opts['tunnel'] = tunnel
     cmd.out("Starting VM "+cmd.args[0]+" on %(tunnel)s to %(bridge_name)s with MAC %(mac_address)s ..."%opts)
-    def out(fh, stdin, output, exit):
-        pass
+
+    #import signal
+    #class Alarm(Exception):
+    #    pass
+    #def alarm_handler(signum, frame):
+    #    raise Alarm
+    #signal.signal(signal.SIGALRM, alarm_handler)
+    #signal.alarm(1)
+
     monitor = []
     serial = []
+
+    def out(fh, stdin, output, exit):
+        pass
+        #while not monitor or not serial:
+        #    print "out(%s %s %s)\n" %(monitor, serial, exit)
+        #    line = fh.readline()
+        #    if not line:
+        #        exit.append(11)
+        #        break
+
     def err(fh, stdin, output, exit):
         while not monitor or not serial:
+            #print "err(%s %s %s)\n" %(monitor, serial, exit)
             line = fh.readline()
+            if not line:
+                exit.append(11)
+                break
+            #import pdb; pdb.set_trace()
             if line.startswith('char device redirected to '):
                 device = line[len('char device redirected to '):-1]
                 if monitor:
@@ -535,9 +560,12 @@ def run(cmd):
                 else:
                     monitor.append(device)
             else:
+                if not cmd.opts.no_console:
+                    cmd.out(line)
                 output.write(line)
             if monitor and serial:
                 exit.append(10)
+
     if not cmd.opts.graphics:
         extra.append('-nographic')
     result = stacks.process(
@@ -574,11 +602,31 @@ def run(cmd):
     cmd.out('Started successfully with pid %r'%result.pid)
     cmd.out('You can access the QEMU monitor for this VM like so:')
     cmd.out('    $ sudo screen %s', monitor)
-    cmd.out('Once connected you should type \'Ctrl+a\' followed by \'k\' to leave the monitor. Typing \'quit\' will exit the VM.')
-    if 0:# cmd.opts.console:
-        os.system('screen %s'%serial)
-    else:
-        cmd.out('You can connect to the VM\'s serial console like this:')
-        cmd.out('    $ sudo screen %s', serial)
-        cmd.out('Again you can exit the console with \'Ctrl+a\' followed by \'k\'.')
+    cmd.out('Once connected you should type \'Ctrl+a\' followed by \'k\' to leave the monitor. (Don\'t type \'quit\' as that will immediately exit the VM - akin to removing the power cable). If you are already running screen, you will need to type \'Ctrl+a a\' followed by k\' to quit the screen connected to %r.', serial)
+    cmd.out('You can connect to the VM\'s serial console like this:')
+    cmd.out('    $ sudo screen %s', serial)
+    cmd.out('Again you can exit the console with \'Ctrl+a\' followed by \'k\' (or \'Ctrl+a a\' followed by k\' if you are already in a screen session).')
+    if not cmd.opts.dont_wait:
+        def errfn(fh, stdin, output, exit):
+            pass
+        def outfn(fh, stdin, output, exit):
+            while not exit:
+                line = fh.readline()
+                if not cmd.opts.no_console:
+                    cmd.out(line, end='')
+                output.write(line)
+                if cmd.opts.wait_message in line:
+                    cmd.out("Found the wait message, exiting ...")
+                    exit.append(0)
+        if not cmd.opts.no_console:
+            cmd.out('Connecting to the VM serial console ...')
+        result = stacks.process(
+            [
+                'socat', '-', serial,
+            ],
+            out=outfn,
+            err=errfn,
+            wait_for_retcode=False,
+        )
+        cmd.out('done.')
 

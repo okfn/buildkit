@@ -4024,7 +4024,12 @@ def process(
         raise Exception('The command should be a string if shell=True')
     if not shell and not isinstance(cmd, (list, tuple)):
         raise Exception('The command should be a list if shell=False')
+    if merge:
+        if print_err is not None:
+            raise Exception('You can\'t use \'merge=True\' to override \'print_err\' if it is already specified')
     if echo:
+        if print_out is not None or print_err is not None:
+            raise Exception('You can\'t use \'echo=True\' to override \'print_out\' and \'print_err\' if they are already specified')
         print_out = print_fn
         print_err = print_err_fn
     if merge:
